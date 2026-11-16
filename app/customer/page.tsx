@@ -1,82 +1,147 @@
 "use client";
 
+import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
-import { MENU, ORDERS } from "@/lib/mock-data/campus";
+import { listFavourites, listMenu, listVendors } from "@/lib/api/menu";
+import { listNotifications } from "@/lib/api/notifications";
+import { ACTIVE_STATUSES, listMyOrders } from "@/lib/api/orders";
+import { getWallet } from "@/lib/api/wallet";
+import { useApi } from "@/lib/hooks/useApi";
 import { useAuthStore } from "@/lib/stores/auth";
-import { useWalletStore } from "@/lib/stores/wallet";
-import { formatRs } from "@/lib/utils";
+import type { CustomerSubRole } from "@/lib/types";
+import { formatRs, formatWhen, statusLabel, timeAgo } from "@/lib/utils";
 import Image from "next/image";
 import Link from "next/link";
+import { useMounted } from "@/lib/hooks/useMounted";
+
+const SUB_ROLES: { id: CustomerSubRole; label: string }[] = [
+  { id: "student", label: "Student" },
+  { id: "academic", label: "Academic Staff" },
+  { id: "non-academic", label: "Non-Academic Staff" },
+];
+
+function greeting() {
+  const h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
 
 export default function CustomerHome() {
   const user = useAuthStore((s) => s.user);
-  const balance = useWalletStore((s) => s.balance);
-  const first = user?.name?.split(" ")[0] ?? "Mira";
-  const favs = MENU.filter((m) => m.favourite || m.id === "m_burger").slice(0, 2);
-  const live = ORDERS[0];
+  const mounted = useMounted();
+  const { data: wallet } = useApi(getWallet);
+  const { data: orders } = useApi(listMyOrders);
+  const { data: menu } = useApi(listMenu);
+  const { data: vendors } = useApi(listVendors);
+  const { data: favIds } = useApi(listFavourites);
+  const { data: notes } = useApi(listNotifications);
+
+  const first = mounted ? (user?.name?.split(" ")[0] ?? "there") : "";
+  const list = orders ?? [];
+  const live = list.find((o) => ACTIVE_STATUSES.includes(o.status) && !o.preOrder);
+  const upcoming = list.find((o) => o.preOrder && ACTIVE_STATUSES.includes(o.status));
+  const delivered = list.filter((o) => o.status === "delivered").length;
+  const active = list.filter((o) => ACTIVE_STATUSES.includes(o.status)).length;
+  const preorders = list.filter((o) => o.preOrder && ACTIVE_STATUSES.includes(o.status));
+  const favs = (menu ?? []).filter((m) => (favIds ?? []).includes(m.id) || m.favourite).slice(0, 3);
+  const vendorName = (id: string) => vendors?.find((v) => v.id === id)?.name ?? "";
+  const imageFor = (o?: (typeof list)[number]) => o?.lines?.[0]?.image ?? menu?.[0]?.image;
 
   return (
     <div>
-      <PageIntro
-        crumb="Customer / Dashboard"
-        title={`Good afternoon, ${first}.`}
-        subtitle="Your lunch plans, all in one place."
-      />
+      <PageIntro crumb="Customer / Dashboard" title={`${greeting()}, ${first}.`} subtitle="Your lunch plans, all in one place." />
       <div className="mb-6 flex flex-wrap gap-2 text-xs font-semibold">
-        <Badge tone="soft">Student · selected</Badge>
-        <Badge tone="muted">Academic Staff · identity example</Badge>
-        <Badge tone="muted">Non-Academic Staff · identity example</Badge>
+        {SUB_ROLES.map((r) => (
+          <Badge key={r.id} tone={mounted && user?.customerSubRole === r.id ? "soft" : "muted"}>
+            {r.label}
+            {mounted && user?.customerSubRole === r.id ? " · your account" : ""}
+          </Badge>
+        ))}
       </div>
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Wallet balance" value={formatRs(balance)} hint="Before sample order payment" />
-        <StatCard label="Your orders" value="12" hint="10 delivered · 1 active · 1 upcoming" />
-        <StatCard label="Upcoming pre-orders" value="1" hint="Tomorrow · 12:30 PM" />
+        <StatCard label="Wallet balance" value={formatRs(wallet?.balance ?? 0)} hint="Available for your next order" />
+        <StatCard label="Your orders" value={String(list.length)} hint={`${delivered} delivered · ${active} active`} />
+        <StatCard
+          label="Upcoming pre-orders"
+          value={String(preorders.length)}
+          hint={preorders[0] ? `${preorders[0].scheduledFor} · ${preorders[0].slot}` : "Schedule from checkout"}
+        />
       </div>
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
         <Card>
-          <h2 className="text-lg font-bold">Your lunch is on its way</h2>
-          <Badge tone="soft" className="mt-3">
-            {live.id} · Out for Delivery
-          </Badge>
-          <div className="mt-4 flex gap-3">
-            <div className="relative h-16 w-16 overflow-hidden rounded-xl">
-              <Image src={MENU[0].image} alt="" fill className="object-cover" />
-            </div>
-            <div>
-              <p className="font-semibold">{MENU[0].name}</p>
-              <p className="text-sm text-muted">Central Canteen · {formatRs(MENU[0].price)}</p>
-              <p className="text-xs text-muted">18 available · Sample stock</p>
-            </div>
-          </div>
-          <p className="mt-3 text-sm text-muted">2 meals · Rs. 1,800 · Delivery to Library pickup zone</p>
-          <p className="note-ok mt-4 rounded-xl px-3 py-2 text-sm">8-minute walking estimate · Sample status, not live tracking</p>
-          <Link href="/customer/track" className="mt-4 inline-block">
-            <Button>
-              Track order →
-            </Button>
-          </Link>
+          {live ? (
+            <>
+              <h2 className="text-lg font-bold">
+                {live.status === "out_for_delivery" ? "Your lunch is on its way" : live.status === "ready" ? "Your order is ready" : "Your order is in the kitchen"}
+              </h2>
+              <OrderStatusBadge status={live.status} className="mt-3" />
+              <div className="mt-4 flex gap-3">
+                {imageFor(live) && (
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl">
+                    <Image src={imageFor(live)!} alt="" fill className="object-cover" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold">{live.items.map((i) => `${i.qty}× ${i.name}`).join(", ")}</p>
+                  <p className="text-sm text-muted">
+                    {live.vendorName} · {formatRs(live.total)}
+                  </p>
+                  <p className="text-xs text-muted capitalize">
+                    {live.id} · {live.fulfillment}
+                    {live.fulfillment === "delivery" ? ` to ${live.destination}` : ""}
+                  </p>
+                </div>
+              </div>
+              <p className="note-ok mt-4 rounded-xl px-3 py-2 text-sm">
+                {statusLabel(live.status)} · placed {timeAgo(live.createdAt)}
+                {live.courierName ? ` · Rider ${live.courierName}` : ""}
+              </p>
+              <Link href={`/customer/track?id=${live.id}`} className="mt-4 inline-block">
+                <Button>Track order →</Button>
+              </Link>
+            </>
+          ) : (
+            <>
+              <h2 className="text-lg font-bold">Hungry?</h2>
+              <p className="mt-2 text-sm text-muted">No active orders right now. Browse today&apos;s campus menu.</p>
+              <Link href="/customer/explore" className="mt-4 inline-block">
+                <Button>Explore food →</Button>
+              </Link>
+            </>
+          )}
         </Card>
         <Card>
           <h2 className="text-lg font-bold">Tomorrow&apos;s lunch, sorted</h2>
-          <Badge tone="soft" className="mt-3">
-            Pre-order · Pickup
-          </Badge>
-          <p className="mt-3 font-semibold">JE-1043 · 15 Oct, 12:30 PM</p>
-          <div className="mt-3 flex gap-3">
-            <div className="relative h-16 w-16 overflow-hidden rounded-xl">
-              <Image src={MENU[1].image} alt="" fill className="object-cover" />
-            </div>
-            <div>
-              <p className="font-semibold">{MENU[1].name}</p>
-              <p className="text-sm text-muted">Central Canteen · {formatRs(MENU[1].price)}</p>
-            </div>
-          </div>
+          {upcoming ? (
+            <>
+              <Badge tone="soft" className="mt-3 capitalize">
+                Pre-order · {upcoming.fulfillment}
+              </Badge>
+              <p className="mt-3 font-semibold">
+                {upcoming.id} · {upcoming.scheduledFor}, {upcoming.slot}
+              </p>
+              <div className="mt-3 flex gap-3">
+                {imageFor(upcoming) && (
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl">
+                    <Image src={imageFor(upcoming)!} alt="" fill className="object-cover" />
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold">{upcoming.items.map((i) => i.name).join(", ")}</p>
+                  <p className="text-sm text-muted">
+                    {upcoming.vendorName} · {formatRs(upcoming.total)}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-muted">No pre-orders yet. Choose “Pre-order” at checkout to schedule a meal.</p>
+          )}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/customer/pre-orders">
+            <Link href={upcoming ? "/customer/orders" : "/customer/pre-orders"}>
               <Button variant="soft" size="sm">
                 Manage schedule
               </Button>
@@ -104,13 +169,26 @@ export default function CustomerHome() {
             </tr>
           </thead>
           <tbody>
-            {ORDERS.map((o) => (
+            {list.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-5 py-3 text-muted">
+                  No orders yet.
+                </td>
+              </tr>
+            )}
+            {list.slice(0, 5).map((o) => (
               <tr key={o.id} className="border-t border-border">
                 <td className="px-5 py-3 font-semibold">{o.id}</td>
-                <td className="capitalize">{o.fulfillment} · {o.placedAt}</td>
+                <td className="capitalize">
+                  {o.fulfillment} · {formatWhen(o.createdAt, o.placedAt)}
+                </td>
                 <td>{formatRs(o.total)}</td>
                 <td className="capitalize">{o.status.replaceAll("_", " ")}</td>
-                <td className="pr-5 text-brand">RC-{o.id.slice(3)} ↗</td>
+                <td className="pr-5">
+                  <Link href={`/customer/track?id=${o.id}`} className="text-brand">
+                    RC-{o.id.slice(3)} ↗
+                  </Link>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -128,17 +206,17 @@ export default function CustomerHome() {
           <h2 className="text-lg font-bold">Your favourites</h2>
           <div className="mt-4 space-y-4">
             {favs.map((m) => (
-              <div key={m.id} className="flex gap-3">
-                <div className="relative h-14 w-14 overflow-hidden rounded-xl">
+              <Link key={m.id} href={`/customer/food/${m.id}`} className="flex gap-3 hover:opacity-90">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl">
                   <Image src={m.image} alt="" fill className="object-cover" />
                 </div>
                 <div>
                   <p className="font-semibold">{m.name}</p>
                   <p className="text-sm text-muted">
-                    {formatRs(m.price)} · {m.stock} available
+                    {vendorName(m.vendorId)} · {formatRs(m.price)} · {m.stock > 0 ? `${m.stock} available` : "Sold out"}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
           <Link href="/customer/explore" className="mt-4 inline-block">
@@ -149,10 +227,15 @@ export default function CustomerHome() {
         </Card>
         <Card>
           <h2 className="text-lg font-bold">Notifications & feedback</h2>
-          <p className="mt-3 font-semibold">Your rider has collected {live.id}</p>
-          <p className="text-sm text-muted">Today, 12:12 PM · Sample notification</p>
-          <p className="mt-4 font-semibold">Pre-order reminder</p>
-          <p className="text-sm text-muted">Tomorrow at 12:30 PM · Central Canteen pickup</p>
+          {(notes ?? []).slice(0, 3).map((n) => (
+            <div key={n.id} className="mt-3">
+              <p className="font-semibold">{n.title}</p>
+              <p className="text-sm text-muted">
+                {n.body} · {timeAgo(n.createdAt ?? n.at)}
+              </p>
+            </div>
+          ))}
+          {(notes ?? []).length === 0 && <p className="mt-3 text-sm text-muted">No notifications yet.</p>}
           <Link href="/customer/profile" className="mt-4 inline-block">
             <Button variant="soft" size="sm">
               Profile & feedback

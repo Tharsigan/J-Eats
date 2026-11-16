@@ -33,7 +33,13 @@ export function MarketingShell({ children }: { children: React.ReactNode }) {
             {MARKETING_NAV.map((item) => (
               <Link
                 key={item.label}
-                href={user && item.href === "/login" ? ROLE_HOME[user.role] : item.href}
+                href={
+                  user && item.href === "/login"
+                    ? user.role === "customer" && "target" in item && item.target
+                      ? item.target
+                      : ROLE_HOME[user.role]
+                    : item.href
+                }
                 className={cn(
                   "transition hover:text-brand",
                   pathname === item.href ? "text-brand" : "text-muted",

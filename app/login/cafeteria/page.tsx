@@ -55,6 +55,9 @@ export default function CafeteriaLoginPage() {
             <Link href="/register/cafeteria" className="font-semibold text-text">
               Register cafeteria →
             </Link>
+            <span className="mt-2 block text-xs">
+              Demo · `canteen@sjp.ac.lk` (Central Canteen), `cafe@sjp.ac.lk` (Faculty Café), `burgerlab@`, `slice@`, `greenbowl@sjp.ac.lk` · pending `lawn.stall@sjp.ac.lk` · any password with 6+ characters.
+            </span>
           </p>
         }
       />

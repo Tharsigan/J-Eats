@@ -10,6 +10,7 @@ import {
   Settings,
   ShoppingBag,
   UserRound,
+  Users,
   UtensilsCrossed,
   Wallet,
   type LucideIcon,
@@ -42,6 +43,7 @@ export const NAV: Record<Role, NavItem[]> = {
   admin: [
     { href: "/admin", label: "Overview", icon: LayoutGrid },
     { href: "/admin#pending-approvals", label: "Pending Approvals", icon: ClipboardCheck },
+    { href: "/admin/users", label: "Users", icon: Users },
     { href: "/admin/ledger", label: "Transactions", icon: ScrollText },
     { href: "/admin/analytics", label: "Reports", icon: BarChart3 },
     { href: "/admin/logs", label: "System Settings", icon: Settings },
@@ -51,11 +53,11 @@ export const NAV: Record<Role, NavItem[]> = {
 export const MARKETING_NAV = [
   { href: "/", label: "Home" },
   { href: "/explore", label: "Explore Food" },
-  { href: "/login", label: "My Orders" },
-  { href: "/login", label: "Pre-Orders" },
-  { href: "/login", label: "Wallet" },
-  { href: "/login", label: "Track Order" },
-  { href: "/login", label: "Profile" },
+  { href: "/login", label: "My Orders", target: "/customer/orders" },
+  { href: "/login", label: "Pre-Orders", target: "/customer/pre-orders" },
+  { href: "/login", label: "Wallet", target: "/customer/wallet" },
+  { href: "/login", label: "Track Order", target: "/customer/track" },
+  { href: "/login", label: "Profile", target: "/customer/profile" },
 ];
 
 export const WORKSPACE_META: Record<

@@ -1,33 +1,35 @@
 "use client";
 
+import { JobCard } from "@/components/orders/JobCard";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { StatCard } from "@/components/ui/StatCard";
-import { acceptJob, listJobs } from "@/lib/api/courier";
-import { JOBS } from "@/lib/mock-data/campus";
+import { acceptJob, declineJob, getOnline, getRiderStats, listJobs, setOnline } from "@/lib/api/courier";
+import { useAction, useApi } from "@/lib/hooks/useApi";
 import { useAuthStore } from "@/lib/stores/auth";
-import { useNotifyStore } from "@/lib/stores/notifications";
-import type { CourierJob } from "@/lib/types";
-import { formatRs } from "@/lib/utils";
+import { formatRs, formatWhen } from "@/lib/utils";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMounted } from "@/lib/hooks/useMounted";
 
 export default function CourierHome() {
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const push = useNotifyStore((s) => s.push);
-  const [jobs, setJobs] = useState<CourierJob[]>(JOBS);
-  const first = user?.name?.split(" ")[0] ?? "Ari";
+  const mounted = useMounted();
+  const { data: jobs } = useApi(listJobs);
+  const { data: online } = useApi(getOnline);
+  const { data: stats } = useApi(getRiderStats);
+  const { busy, error, message, run } = useAction();
+  const first = mounted ? (user?.name?.split(" ")[0] ?? "rider") : "";
 
-  useEffect(() => {
-    listJobs().then(setJobs);
-  }, []);
+  const open = (jobs ?? []).filter((j) => j.status === "open");
+  const active = (jobs ?? []).find((j) => j.courierId === user?.id && (j.status === "accepted" || j.status === "picked"));
 
   async function take(id: string) {
-    const updated = await acceptJob(id);
-    setJobs((prev) => prev.map((j) => (j.id === id ? (updated ?? { ...j, status: "accepted" }) : j)));
-    push("Job accepted", `Head to ${updated?.from ?? "pickup"}`);
+    const job = await run(id, () => acceptJob(id), (j) => `Job accepted · head to ${j?.from ?? "pickup"}.`);
+    if (job) router.push("/courier/navigate");
   }
 
   return (
@@ -35,57 +37,74 @@ export default function CourierHome() {
       <PageIntro
         crumb="Rider / Dashboard & Delivery Jobs"
         title={`Ready for a campus run, ${first}?`}
-        subtitle="Approved rider · Eligible sample jobs near your campus pickup zone."
+        subtitle="Approved rider · Eligible jobs near your campus pickup zone."
       />
       <div className="mb-6 flex flex-wrap gap-2">
         <Badge tone="soft">Verification approved</Badge>
-        <Button size="sm">Online · selected</Button>
-        <Button size="sm" variant="outline">
-          Offline
+        <Button size="sm" variant={online !== false ? "primary" : "outline"} onClick={() => void run("on", () => setOnline(true), "You're online. New jobs will appear here.")}>
+          Online{online !== false ? " · selected" : ""}
+        </Button>
+        <Button size="sm" variant={online === false ? "primary" : "outline"} onClick={() => void run("off", () => setOnline(false), "You're offline. You won't receive new jobs.")}>
+          Offline{online === false ? " · selected" : ""}
         </Button>
       </div>
       <div className="grid gap-4 md:grid-cols-3">
-        <StatCard label="Today's earnings" value={formatRs(500)} hint="5 completed deliveries × Rs. 100" />
-        <StatCard label="Active delivery" value="1" hint="JE-1042 · Rs. 100 on completion" />
-        <StatCard label="This week" value={formatRs(2400)} hint="24 completed sample deliveries" />
+        <StatCard label="Today's earnings" value={formatRs(stats?.today ?? 0)} hint={`${stats?.todayCount ?? 0} completed deliveries today`} />
+        <StatCard
+          label="Active delivery"
+          value={active ? "1" : "0"}
+          hint={active ? `${active.orderId} · ${formatRs(active.payout)} on completion` : "Accept a job to start"}
+        />
+        <StatCard label="This week" value={formatRs(stats?.week ?? 0)} hint={`${stats?.weekCount ?? 0} completed deliveries`} />
       </div>
       <p className="note-ok mt-4 rounded-xl px-3 py-2 text-sm">
-        Matching explanation: sample pickup proximity + Online availability + approved verification. Real delivery matching is not connected.
+        Matching: jobs open when a kitchen marks a delivery order ready. One active delivery at a time. Live GPS matching is not connected.
       </p>
+      {error && <p className="note-danger mt-3 rounded-xl px-3 py-2 text-sm">{error}</p>}
+      {message && <p className="note-ok mt-3 rounded-xl px-3 py-2 text-sm">{message}</p>}
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
-        {jobs
-          .filter((j) => j.status === "open")
-          .map((j) => (
-            <Card key={j.id}>
-              <h2 className="text-lg font-bold">
-                {j.id.replace("job_", "JE-104")} · Ready for Pickup
-              </h2>
+        {online === false && (
+          <Card>
+            <h2 className="text-lg font-bold">You&apos;re offline</h2>
+            <p className="mt-2 text-sm text-muted">Go online to see delivery jobs near you.</p>
+          </Card>
+        )}
+        {online !== false && open.length === 0 && (
+          <Card>
+            <h2 className="text-lg font-bold">No open jobs right now</h2>
+            <p className="mt-2 text-sm text-muted">New jobs appear here as soon as a cafeteria marks a delivery order ready.</p>
+          </Card>
+        )}
+        {open.slice(0, 4).map((j) => (
+          <JobCard
+            key={j.id}
+            job={j}
+            busy={busy === j.id}
+            blocked={Boolean(active)}
+            onAccept={() => void take(j.id)}
+            onDecline={() => void run(`d${j.id}`, () => declineJob(j.id), "Job declined. It stays available for other riders.")}
+          />
+        ))}
+        <Card>
+          <h2 className="text-lg font-bold">Active delivery{active ? ` · ${active.orderId}` : ""}</h2>
+          {active ? (
+            <>
               <Badge tone="soft" className="mt-2">
-                Eligible · sample match
+                {active.status === "picked" ? "Out for Delivery" : "Head to the counter"}
               </Badge>
               <p className="mt-3 font-semibold">
-                {j.from} → {j.to}
+                {active.from} → {active.to}
               </p>
               <p className="text-sm text-muted">
-                {(j.distanceM / 1000).toFixed(1)} km schematic distance · {Math.max(6, Math.round(j.distanceM / 70))} min walking estimate
+                {Math.max(6, Math.round(active.distanceM / 70))} min walking estimate · {formatRs(active.payout)} on completion
               </p>
-              <p className="mt-3 text-2xl font-bold">Earn {formatRs(j.payout)}</p>
-              <div className="mt-4 flex gap-2">
-                <Button onClick={() => take(j.id)}>Accept job</Button>
-                <Button variant="soft">Decline</Button>
-              </div>
-            </Card>
-          ))}
-        <Card>
-          <h2 className="text-lg font-bold">Active delivery · JE-1042</h2>
-          <Badge tone="soft" className="mt-2">
-            Out for Delivery
-          </Badge>
-          <p className="mt-3 font-semibold">Central Canteen → Library pickup zone</p>
-          <p className="text-sm text-muted">8 min walking estimate · Rs. 100 on completion</p>
-          <Link href="/courier/navigate" className="mt-4 inline-block">
-            <Button>Open active delivery →</Button>
-          </Link>
+              <Link href="/courier/navigate" className="mt-4 inline-block">
+                <Button>Open active delivery →</Button>
+              </Link>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted">No active delivery. Accept a job to get started.</p>
+          )}
         </Card>
         <Card>
           <h2 className="text-lg font-bold">History & notifications</h2>
@@ -98,17 +117,33 @@ export default function CourierHome() {
               </tr>
             </thead>
             <tbody>
-              {[
-                ["JE-1040", "Delivered · 11:40 AM", "Rs. 100"],
-                ["JE-1039", "Delivered · 11:10 AM", "Rs. 100"],
-                ["JE-1044", "Declined · not active", "Rs. 0"],
-              ].map((r) => (
-                <tr key={r[0]} className="border-t border-border">
-                  <td className="py-2 font-semibold">{r[0]}</td>
-                  <td>{r[1]}</td>
-                  <td>{r[2]}</td>
+              {(stats?.history ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={3} className="py-2 text-muted">
+                    No deliveries yet.
+                  </td>
                 </tr>
-              ))}
+              )}
+              {(stats?.history ?? []).slice(0, 6).map((j) => {
+                const declined = j.courierId !== user?.id;
+                return (
+                  <tr key={j.id} className="border-t border-border">
+                    <td className="py-2 font-semibold">{j.orderId ?? j.id}</td>
+                    <td>
+                      {declined
+                        ? "Declined"
+                        : j.status === "delivered"
+                          ? `Delivered · ${formatWhen(j.completedAt)}`
+                          : j.status === "cancelled"
+                            ? "Cancelled by kitchen"
+                            : j.status === "picked"
+                              ? "Out for delivery"
+                              : "Accepted"}
+                    </td>
+                    <td>{j.status === "delivered" && !declined ? formatRs(j.payout) : "Rs. 0"}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>

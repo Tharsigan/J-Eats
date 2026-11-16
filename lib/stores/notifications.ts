@@ -4,28 +4,24 @@ import { create } from "zustand";
 import type { Notification } from "../types";
 import { uid } from "../utils";
 
+/**
+ * Short-lived toast messages for instant feedback (added to cart, saved, …).
+ * Persistent, per-user notifications live in `lib/api/notifications.ts`.
+ */
 type NotifyState = {
   items: Notification[];
-  push: (title: string, body: string) => void;
+  push: (title: string, body: string, tone?: "ok" | "error") => void;
   markRead: (id: string) => void;
 };
 
 export const useNotifyStore = create<NotifyState>((set) => ({
-  items: [
-    {
-      id: "n1",
-      title: "Order JE-1042",
-      body: "Central Canteen started preparing your rice & curry.",
-      at: "2 min ago",
-      read: false,
-    },
-  ],
-  push: (title, body) =>
+  items: [],
+  push: (title, body, tone = "ok") => {
+    const id = uid("t");
     set((s) => ({
-      items: [{ id: uid("n"), title, body, at: "Just now", read: false }, ...s.items],
-    })),
-  markRead: (id) =>
-    set((s) => ({
-      items: s.items.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    })),
+      items: [{ id, title, body, at: tone, read: false }, ...s.items].slice(0, 4),
+    }));
+    setTimeout(() => set((s) => ({ items: s.items.filter((n) => n.id !== id) })), 3500);
+  },
+  markRead: (id) => set((s) => ({ items: s.items.filter((n) => n.id !== id) })),
 }));

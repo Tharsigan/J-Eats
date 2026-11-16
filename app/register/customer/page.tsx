@@ -68,8 +68,8 @@ export default function CustomerRegisterPage() {
       form.set("verificationDocKind", copy.docLabel);
       await registerWithDocuments(form);
       setSubmitted(true);
-    } catch {
-      setError("Unable to submit registration. Try again.");
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Unable to submit registration. Try again.");
     } finally {
       setBusy(false);
     }

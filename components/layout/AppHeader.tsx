@@ -7,12 +7,12 @@ import { useAuthStore } from "@/lib/stores/auth";
 import { cartCount, useCartStore } from "@/lib/stores/cart";
 import { NAV } from "@/lib/nav";
 import type { Role } from "@/lib/types";
-import { Bell, Menu, ShoppingBag, X } from "lucide-react";
+import { Menu, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { useNotifyStore } from "@/lib/stores/notifications";
+import { NotificationBell } from "./NotificationBell";
 
 export function AppHeader({ role }: { role: Role }) {
   const pathname = usePathname();
@@ -20,11 +20,9 @@ export function AppHeader({ role }: { role: Role }) {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const lines = useCartStore((s) => s.lines);
-  const notices = useNotifyStore((s) => s.items);
   const [open, setOpen] = useState(false);
   const items = NAV[role];
   const count = useMemo(() => cartCount(lines), [lines]);
-  const unread = notices.filter((n) => !n.read).length;
 
   return (
     <header className="glass-header sticky top-0 z-40">
@@ -50,7 +48,7 @@ export function AppHeader({ role }: { role: Role }) {
           <ThemeToggle />
           {role === "customer" && (
             <Link
-              href="/customer/orders"
+              href="/customer/pre-orders"
               className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border"
               aria-label="Cart"
             >
@@ -62,16 +60,7 @@ export function AppHeader({ role }: { role: Role }) {
               )}
             </Link>
           )}
-          <button
-            type="button"
-            className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border"
-            aria-label="Notifications"
-          >
-            <Bell className="h-4 w-4" />
-            {unread > 0 && (
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand" />
-            )}
-          </button>
+          {user && <NotificationBell className="h-10 w-10" />}
           {user ? (
             <Button
               size="sm"
