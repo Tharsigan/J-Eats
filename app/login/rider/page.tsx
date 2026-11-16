@@ -55,6 +55,9 @@ export default function RiderLoginPage() {
             <Link href="/register/rider" className="font-semibold text-text">
               Register as rider →
             </Link>
+            <span className="mt-2 block text-xs">
+              Demo · approved `ari@sjp.ac.lk` or `dilan.rider@sjp.ac.lk` · pending `kasun.rider@sjp.ac.lk` · any password with 6+ characters.
+            </span>
           </p>
         }
       />

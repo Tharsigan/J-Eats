@@ -12,7 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-function readCookie(name: string) {
+export function readCookie(name: string) {
   if (typeof document === "undefined") return "";
   const match = document.cookie.split("; ").find((c) => c.startsWith(`${name}=`));
   return match ? decodeURIComponent(match.split("=")[1] ?? "") : "";
@@ -38,3 +38,18 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 }
 
 export { USE_MOCKS, BASE as API_BASE };
+
+/** Mock tokens look like `mock.<role>.<userId>`; the Flask API will issue real JWTs instead. */
+export function currentSession(): { role: string; userId: string } | null {
+  const token = readCookie(TOKEN_COOKIE);
+  if (!token.startsWith("mock.")) return null;
+  const [, role, ...rest] = token.split(".");
+  const userId = rest.join(".");
+  return role && userId ? { role, userId } : null;
+}
+
+export function requireSession() {
+  const session = currentSession();
+  if (!session) throw new ApiError(401, "Your session has expired. Please sign in again.");
+  return session;
+}

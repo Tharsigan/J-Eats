@@ -42,8 +42,8 @@ export default function RiderRegisterPage() {
       form.set("verificationDocKind2", "Driving License / Vehicle Proof");
       await registerWithDocuments(form);
       setSubmitted(true);
-    } catch {
-      setError("Unable to submit registration. Try again.");
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Unable to submit registration. Try again.");
     } finally {
       setBusy(false);
     }

@@ -50,7 +50,8 @@ export default function AdminLoginPage() {
         onSubmit={submit}
         extraNote={
           <p className="text-xs text-muted">
-            Administrator accounts are provisioned internally. There is no public registration.
+            Administrator accounts are provisioned internally. There is no public registration. Demo · `admin@jeats.lk` · any password
+            with 6+ characters.
           </p>
         }
       />

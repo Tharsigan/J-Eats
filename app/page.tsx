@@ -4,8 +4,13 @@ import { MarketingShell } from "@/components/layout/MarketingShell";
 import { FoodCard } from "@/components/food/FoodCard";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { listMenu, listVendors } from "@/lib/api/menu";
+import { useApi } from "@/lib/hooks/useApi";
 import { MENU, VENDORS } from "@/lib/mock-data/campus";
 import { useCartStore } from "@/lib/stores/cart";
+import { useNotifyStore } from "@/lib/stores/notifications";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Bike, Clock, Search, ShieldCheck, UtensilsCrossed } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -19,8 +24,27 @@ const CATS = [
 ];
 
 export default function Home() {
+  const router = useRouter();
   const add = useCartStore((s) => s.add);
-  const featured = MENU.slice(0, 4);
+  const toast = useNotifyStore((s) => s.push);
+  const { data: liveMenu } = useApi(listMenu);
+  const { data: liveVendors } = useApi(listVendors);
+  const menu = liveMenu ?? MENU;
+  const vendors = liveVendors ?? VENDORS;
+  const featured = menu.filter((m) => m.available).slice(0, 4);
+  const [q, setQ] = useState("");
+  const stock = (id: string) => menu.find((m) => m.id === id)?.stock ?? 0;
+  const totalStock = menu.filter((m) => m.available).reduce((n, m) => n + m.stock, 0);
+
+  function savePromo(code: string) {
+    try {
+      sessionStorage.setItem("jeats-promo", code);
+    } catch {
+      // storage unavailable
+    }
+    void navigator.clipboard?.writeText(code).catch(() => undefined);
+    toast(`${code} saved`, "It will be pre-filled at checkout.");
+  }
 
   return (
     <MarketingShell>
@@ -33,9 +57,15 @@ export default function Home() {
             <div className="mt-6 flex flex-wrap gap-3">
               <label className="flex min-w-64 flex-1 items-center gap-2 rounded-full border border-border bg-surface px-4 py-3 text-sm">
                 <Search className="h-4 w-4 text-muted" />
-                <input className="w-full bg-transparent outline-none" placeholder="Search for meals, cafeterias, or food vendors" />
+                <input
+                  className="w-full bg-transparent outline-none"
+                  placeholder="Search for meals, cafeterias, or food vendors"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && router.push(`/explore${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`)}
+                />
               </label>
-              <Link href="/explore">
+              <Link href={`/explore${q.trim() ? `?q=${encodeURIComponent(q.trim())}` : ""}`}>
                 <Button>Order Now</Button>
               </Link>
             </div>
@@ -66,15 +96,15 @@ export default function Home() {
 
         <div className="mt-10 grid gap-4 sm:grid-cols-3">
           <Card>
-            <p className="text-3xl font-bold">Demo</p>
-            <p className="text-sm text-muted">Sample availability shown</p>
+            <p className="text-3xl font-bold">{totalStock}</p>
+            <p className="text-sm text-muted">Meals available across {vendors.filter((v) => v.openNow).length} open vendors</p>
           </Card>
           <Card>
-            <p className="text-3xl font-bold">18</p>
+            <p className="text-3xl font-bold">{stock("m_rice_curry")}</p>
             <p className="text-sm text-muted">Campus Chicken Rice & Curry available</p>
           </Card>
           <Card>
-            <p className="text-3xl font-bold">3</p>
+            <p className="text-3xl font-bold">{stock("m_burger")}</p>
             <p className="text-sm text-muted">Crispy Chicken Burger available</p>
           </Card>
         </div>
@@ -84,7 +114,7 @@ export default function Home() {
           <p className="mt-1 text-sm text-muted">A proper meal or a quick pinch-me-up. You choose.</p>
           <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
             {CATS.map((c) => (
-              <Link key={c.name} href="/explore" className="text-center">
+              <Link key={c.name} href={`/explore?cat=${encodeURIComponent(c.name)}`} className="text-center">
                 <div className="relative mx-auto h-28 w-28 overflow-hidden rounded-full">
                   <Image src={c.img} alt="" fill className="object-cover" />
                 </div>
@@ -109,8 +139,8 @@ export default function Home() {
               <FoodCard
                 key={m.id}
                 item={m}
-                vendorName={VENDORS.find((v) => v.id === m.vendorId)?.name}
-                onAdd={() =>
+                vendorName={vendors.find((v) => v.id === m.vendorId)?.name}
+                onAdd={() => {
                   add({
                     itemId: m.id,
                     name: m.name,
@@ -121,8 +151,9 @@ export default function Home() {
                     notes: "",
                     fulfillment: "pickup",
                     slotId: null,
-                  })
-                }
+                  });
+                  toast("Added to cart", `1 × ${m.name}`);
+                }}
               />
             ))}
           </div>
@@ -132,7 +163,7 @@ export default function Home() {
           <h2 className="text-2xl font-bold">Good food, close to class</h2>
           <p className="mt-1 text-sm text-muted">Meet the university cafeterias that keep your day going.</p>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {VENDORS.slice(0, 3).map((v, i) => (
+            {vendors.slice(0, 3).map((v, i) => (
               <article key={v.id} className="overflow-hidden rounded-[1.4rem] border border-border bg-surface">
                 <div className="relative h-40">
                   <Image
@@ -151,7 +182,7 @@ export default function Home() {
                 <div className="p-4">
                   <h3 className="font-semibold">{v.name}</h3>
                   <p className="text-sm text-muted">{v.location}</p>
-                  <p className="mt-2 text-sm text-brand">Open now · Closes at {v.closesAt}</p>
+                  <p className="mt-2 text-sm text-brand">{v.openNow ? "Open now" : "Closed"} · Closes at {v.closesAt}</p>
                 </div>
               </article>
             ))}
@@ -163,14 +194,14 @@ export default function Home() {
             <p className="text-xs font-semibold text-brand">Student-sized prices</p>
             <h3 className="mt-2 text-xl font-bold">Your first bite is on us.</h3>
             <p className="mt-2 text-sm text-muted">Take 20% off your first order up to Rs. 350.</p>
-            <Button variant="soft" className="mt-4" size="sm">
+            <Button variant="soft" className="mt-4" size="sm" onClick={() => savePromo("FIRSTBITE")}>
               Use firstbite
             </Button>
           </Card>
           <Card className="bg-[#10231c] text-white">
             <h3 className="text-xl font-bold">Lunch crew? Sorted.</h3>
             <p className="mt-2 text-sm text-white/70">Free delivery on orders over Rs. 1,500.</p>
-            <Button className="mt-4 bg-white text-brand hover:bg-white/90" size="sm">
+            <Button className="mt-4 bg-white text-brand hover:bg-white/90" size="sm" onClick={() => savePromo("CAMPUSCREW")}>
               Use campuscrew
             </Button>
           </Card>

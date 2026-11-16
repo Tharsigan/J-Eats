@@ -10,36 +10,58 @@ import { QuantityStepper } from "@/components/ui/QuantityStepper";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
 import { StarRating } from "@/components/ui/StarRating";
 import { TimeSlotPicker } from "@/components/ui/TimeSlotPicker";
-import { MENU, REVIEWS, TIME_SLOTS, VENDORS } from "@/lib/mock-data/campus";
+import { currentSession } from "@/lib/api/client";
+import { listFavourites, listRelated, listReviews, listSlots, listVendors, toggleFavourite } from "@/lib/api/menu";
+import { useApi } from "@/lib/hooks/useApi";
 import { useCartStore } from "@/lib/stores/cart";
 import { useNotifyStore } from "@/lib/stores/notifications";
 import type { Fulfillment, MenuItem, SpiceLevel } from "@/lib/types";
-import { formatRs } from "@/lib/utils";
+import { formatRs, timeAgo } from "@/lib/utils";
 import { Bike, CheckCircle2, Clock, Heart, Leaf, ShieldCheck, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem; backHref?: string }) {
-  const vendor = VENDORS.find((v) => v.id === item.vendorId) ?? VENDORS[0];
-  const related = MENU.filter((m) => m.id !== item.id).slice(0, 3);
-  const reviews = REVIEWS.filter((r) => r.itemId === item.id);
+  const { data: vendors } = useApi(listVendors);
+  const { data: related } = useApi(() => listRelated(item.id), [item.id]);
+  const { data: reviews } = useApi(() => listReviews(item.id), [item.id]);
+  const { data: slotData } = useApi(() => listSlots(), []);
+  const { data: favourites } = useApi(listFavourites);
+  const vendor = vendors?.find((v) => v.id === item.vendorId);
+  const vendorName = (id: string) => vendors?.find((v) => v.id === id)?.name;
   const add = useCartStore((s) => s.add);
+  const lines = useCartStore((s) => s.lines);
   const push = useNotifyStore((s) => s.push);
 
   const [spice, setSpice] = useState<SpiceLevel>("medium");
   const [notes, setNotes] = useState("");
   const [qty, setQty] = useState(1);
   const [fulfillment, setFulfillment] = useState<Fulfillment>("pickup");
-  const [slotId, setSlotId] = useState<string | null>(TIME_SLOTS.find((s) => s.available)?.id ?? null);
-  const [loved, setLoved] = useState(false);
+  const [pickedSlot, setSlotId] = useState<string | null>(null);
 
+  const slots = slotData ?? [];
+  const slotId = pickedSlot ?? slots.find((s) => s.available)?.id ?? null;
+  const loved = (favourites ?? []).includes(item.id);
+  const inCart = lines.filter((l) => l.itemId === item.id).reduce((n, l) => n + l.quantity, 0);
+  const limit = Math.max(0, Math.min(item.stock, item.maxPerOrder) - inCart);
+  const soldOut = item.stock === 0 || !item.available || (vendor ? !vendor.openNow : false);
   const total = item.price * qty;
-  const remaining = item.maxPerOrder;
 
-  const slots = useMemo(() => TIME_SLOTS, []);
+  async function toggleLoved() {
+    if (!currentSession()) {
+      push("Sign in to save favourites", "Log in as a customer to keep a favourites list.", "error");
+      return;
+    }
+    const next = await toggleFavourite(item.id);
+    push(next.includes(item.id) ? "Saved to favourites" : "Removed from favourites", item.name);
+  }
 
   function addToCart() {
+    if (qty > limit) {
+      push("Quantity limit", limit ? `You can add ${limit} more ${item.name}.` : `Maximum ${item.name} already in your cart.`, "error");
+      return;
+    }
     add({
       itemId: item.id,
       name: item.name,
@@ -52,6 +74,7 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
       slotId,
     });
     push("Added to cart", `${qty} × ${item.name}`);
+    setQty(1);
   }
 
   return (
@@ -74,14 +97,14 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
             )}
             <button
               type="button"
-              onClick={() => setLoved((v) => !v)}
+              onClick={() => void toggleLoved()}
               className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 text-white"
               aria-label="Save"
             >
               <Heart className={`h-5 w-5 ${loved ? "fill-rose-400 text-rose-400" : ""}`} />
             </button>
           </div>
-          <VendorCard vendor={vendor} />
+          {vendor && <VendorCard vendor={vendor} />}
           <p className="mt-4 flex items-start gap-2 text-sm text-muted">
             <Leaf className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
             Prepared fresh on campus. Packed with care, delivered to your door.
@@ -96,9 +119,9 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
               <StarRating value={item.rating} />
               <span className="font-semibold">{item.rating.toFixed(1)}</span>
               <span className="text-muted">({item.reviewCount} reviews)</span>
-              <Link href="/customer/reviews" className="text-brand hover:underline">
+              <a href="#reviews" className="text-brand hover:underline">
                 See reviews
-              </Link>
+              </a>
             </div>
             <p className="mt-4 text-sm leading-relaxed text-muted">{item.description}</p>
             <p className="mt-5 text-3xl font-bold">{formatRs(item.price)}</p>
@@ -141,12 +164,26 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
               <p className="text-sm font-semibold">Quantity (max {item.maxPerOrder})</p>
               <p className="text-xs text-muted">Max {item.maxPerOrder}</p>
             </div>
-            <QuantityStepper value={qty} max={Math.min(item.stock, item.maxPerOrder)} onChange={setQty} />
+            <QuantityStepper value={qty} max={Math.max(1, limit)} onChange={setQty} />
           </div>
 
-          <Button size="lg" className="w-full" onClick={addToCart} disabled={item.stock === 0}>
-            Add to Cart · {formatRs(total)}
+          <Button size="lg" className="w-full" onClick={addToCart} disabled={soldOut || limit === 0}>
+            {soldOut
+              ? vendor && !vendor.openNow
+                ? `${vendor.name} is closed`
+                : "Sold out"
+              : limit === 0
+                ? "Maximum already in cart"
+                : `Add to Cart · ${formatRs(total)}`}
           </Button>
+          {inCart > 0 && (
+            <p className="text-center text-xs text-muted">
+              {inCart} already in your cart ·{" "}
+              <Link href="/customer/pre-orders" className="font-semibold text-brand">
+                Go to checkout →
+              </Link>
+            </p>
+          )}
           <p className="flex items-center justify-center gap-2 text-xs text-muted">
             <ShieldCheck className="h-4 w-4" />
             Secure online payments. Live order tracking.
@@ -154,9 +191,9 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
 
           <div className="space-y-4">
             <p className="text-sm font-semibold">
-              Sample availability · {remaining} available
+              Live availability · {item.stock} available
               <span className="ml-2 text-xs font-normal text-muted">
-                {item.stock} available · Max {item.maxPerOrder}
+                Max {item.maxPerOrder} per order
               </span>
             </p>
             <SegmentedControl
@@ -169,7 +206,7 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
                     <span className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-brand" />
                       Pickup
-                      <span className="block text-xs font-normal text-muted">Collect at {vendor.name}</span>
+                      <span className="block text-xs font-normal text-muted">Collect at {vendor?.name ?? "the counter"}</span>
                     </span>
                   ),
                 },
@@ -200,20 +237,23 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
         </div>
       </div>
 
-      <section>
+      <section id="reviews" className="scroll-mt-24">
         <h2 className="text-2xl font-bold">Good food. Good reviews.</h2>
         <p className="mt-1 text-sm text-muted">
           {item.rating.toFixed(1)} out of 5 · from {item.reviewCount} campus foodies
         </p>
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          {reviews.map((r) => (
+          {(reviews ?? []).length === 0 && (
+            <p className="text-sm text-muted">No reviews yet. Order it and be the first to rate it.</p>
+          )}
+          {(reviews ?? []).map((r) => (
             <Card key={r.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">{r.author}</p>
                   <StarRating value={r.rating} />
                 </div>
-                <span className="text-xs text-muted">{r.daysAgo} days ago</span>
+                <span className="text-xs text-muted">{r.createdAt ? timeAgo(r.createdAt) : `${r.daysAgo} days ago`}</span>
               </div>
               <p className="mt-3 text-sm text-muted">{r.body}</p>
               {r.verified && (
@@ -230,12 +270,13 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
         <h2 className="text-2xl font-bold">Keep the cravings going</h2>
         <p className="mt-1 text-sm text-muted">A few more student favourites worth a look.</p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {related.map((m) => (
+          {(related ?? []).map((m) => (
             <FoodCard
               key={m.id}
               item={m}
-              vendorName={VENDORS.find((v) => v.id === m.vendorId)?.name}
-              onAdd={() =>
+              href={`${backHref.startsWith("/customer") ? "/customer/food" : "/food"}/${m.id}`}
+              vendorName={vendorName(m.vendorId)}
+              onAdd={() => {
                 add({
                   itemId: m.id,
                   name: m.name,
@@ -246,8 +287,9 @@ export function FoodDetailView({ item, backHref = "/explore" }: { item: MenuItem
                   notes: "",
                   fulfillment: "pickup",
                   slotId: null,
-                })
-              }
+                });
+                push("Added to cart", `1 × ${m.name}`);
+              }}
             />
           ))}
         </div>

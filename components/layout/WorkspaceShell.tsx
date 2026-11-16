@@ -1,23 +1,42 @@
 "use client";
 
 import { Logo } from "./Logo";
+import { NotificationBell } from "./NotificationBell";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { logoutRemote } from "@/lib/api/auth";
 import { NAV, WORKSPACE_META } from "@/lib/nav";
 import { useAuthStore } from "@/lib/stores/auth";
+import { cartCount, useCartStore } from "@/lib/stores/cart";
 import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Menu, X } from "lucide-react";
+import { Menu, ShoppingBag, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useMounted } from "@/lib/hooks/useMounted";
 import { useState } from "react";
 
 export function WorkspaceShell({ role, children }: { role: Role; children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const logout = useAuthStore((s) => s.logout);
+  const user = useAuthStore((s) => s.user);
+  const lines = useCartStore((s) => s.lines);
   const items = NAV[role];
   const meta = WORKSPACE_META[role];
   const [open, setOpen] = useState(false);
+  // Persisted stores hydrate on the client; avoid a server/client mismatch for user-specific bits.
+  const mounted = useMounted();
+  const count = mounted ? cartCount(lines) : 0;
+
+  async function signOut() {
+    await logoutRemote();
+    logout();
+    router.push("/login");
+  }
+
+  function isActiveHash(href: string) {
+    return href.includes("#") ? false : isActive(href);
+  }
 
   function isActive(href: string) {
     if (href === `/${role}`) return pathname === href;
@@ -32,7 +51,7 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
       <nav className="flex flex-col gap-1">
         {items.map((item) => {
           const Icon = item.icon;
-          const active = isActive(item.href);
+          const active = isActiveHash(item.href);
           return (
             <Link
               key={item.href}
@@ -60,10 +79,7 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
         <button
           type="button"
           className="text-muted hover:text-text"
-          onClick={() => {
-            logout();
-            router.push("/login");
-          }}
+          onClick={() => void signOut()}
         >
           Sign out
         </button>
@@ -74,8 +90,8 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
   return (
     <div className="min-h-screen bg-bg">
       <header className="sticky top-0 z-40 border-b border-border bg-surface">
-        <div className="flex items-center justify-between gap-4 px-4 py-3 lg:px-6">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-4 lg:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border lg:hidden"
               onClick={() => setOpen((v) => !v)}
@@ -85,7 +101,7 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
             </button>
             <Link href={`/${role}`} className="flex items-center gap-3">
               <Logo compact />
-              <span className="leading-tight">
+              <span className="hidden leading-tight sm:inline">
                 <span className="block text-sm font-bold">University of Jayewardenepura</span>
                 <span className="block text-xs text-muted">{meta.subtitle}</span>
               </span>
@@ -93,8 +109,23 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
+            {role === "customer" && (
+              <Link
+                href="/customer/pre-orders"
+                className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-border"
+                aria-label={`Cart${count ? ` (${count} items)` : ""}`}
+              >
+                <ShoppingBag className="h-4 w-4" />
+                {count > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white">
+                    {count}
+                  </span>
+                )}
+              </Link>
+            )}
+            {mounted && <NotificationBell />}
             <span className="hidden rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-brand sm:inline">
-              {meta.account}
+              {mounted && user ? `${user.name} · ${meta.account}` : meta.account}
             </span>
           </div>
         </div>

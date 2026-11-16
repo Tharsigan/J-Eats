@@ -13,6 +13,10 @@ export type User = {
   verificationStatus?: VerificationStatus;
   verificationDocUrl?: string;
   verificationDocName?: string;
+  /** Cafeteria operators manage exactly one vendor. */
+  vendorId?: string;
+  status?: "active" | "suspended";
+  phone?: string;
 };
 
 export type VerificationDocument = {
@@ -78,6 +82,8 @@ export type Review = {
   body: string;
   daysAgo: number;
   verified: boolean;
+  userId?: string;
+  createdAt?: string;
 };
 
 export type TimeSlot = {
@@ -119,6 +125,39 @@ export type Order = {
   payment: PaymentMethod;
   placedAt: string;
   pickupPoint?: string;
+  customerId?: string;
+  vendorId?: string;
+  vendorName?: string;
+  lines?: OrderLine[];
+  deliveryFee?: number;
+  destination?: string;
+  /** Scheduled pickup / delivery time, e.g. "12:30". */
+  slot?: string;
+  /** ISO date (yyyy-mm-dd) when the order is scheduled for a later day. */
+  scheduledFor?: string;
+  preOrder?: boolean;
+  notes?: string;
+  courierId?: string;
+  courierName?: string;
+  jobId?: string;
+  cancelReason?: string;
+  paymentRef?: string;
+  paymentStatus?: "paid" | "pending" | "refunded";
+  createdAt?: string;
+  timeline?: { status: OrderStatus; at: string; note?: string }[];
+  reviewed?: boolean;
+  discount?: number;
+  promoCode?: string;
+};
+
+export type OrderLine = {
+  itemId: string;
+  name: string;
+  qty: number;
+  unitPrice: number;
+  spice?: SpiceLevel;
+  notes?: string;
+  image?: string;
 };
 
 export type WalletTxn = {
@@ -127,6 +166,9 @@ export type WalletTxn = {
   amount: number;
   type: "credit" | "debit";
   at: string;
+  kind?: "topup" | "payment" | "refund" | "payout" | "earning" | "donation" | "withdrawal";
+  ref?: string;
+  createdAt?: string;
 };
 
 export type CourierJob = {
@@ -136,7 +178,13 @@ export type CourierJob = {
   payout: number;
   distanceM: number;
   items: number;
-  status: "open" | "accepted" | "picked" | "delivered";
+  status: "open" | "accepted" | "picked" | "delivered" | "cancelled";
+  orderId?: string;
+  courierId?: string;
+  declinedBy?: string[];
+  createdAt?: string;
+  completedAt?: string;
+  customerName?: string;
 };
 
 export type InventoryRow = {
@@ -152,8 +200,9 @@ export type LedgerEntry = {
   ref: string;
   party: string;
   amount: number;
-  type: "sale" | "payout" | "topup" | "refund";
+  type: "sale" | "payout" | "topup" | "refund" | "donation";
   at: string;
+  createdAt?: string;
 };
 
 export type Stall = {
@@ -171,6 +220,12 @@ export type Notification = {
   body: string;
   at: string;
   read: boolean;
+  userId?: string;
+  role?: Role;
+  href?: string;
+  createdAt?: string;
+  /** For role-wide broadcasts: users who have read it. */
+  readBy?: string[];
 };
 
 export type MapPoint = {
@@ -180,3 +235,15 @@ export type MapPoint = {
   x: number;
   y: number;
 };
+
+export type SystemLog = { id: string; level: "info" | "warn" | "ok" | "error"; msg: string; at: string; createdAt?: string };
+
+export type PlatformSettings = {
+  deliveryFee: number;
+  riderPayout: number;
+  cashCutoffHour: number;
+  orderingOpen: boolean;
+  maxActiveJobsPerRider: number;
+};
+
+export type Wallet = { userId: string; balance: number; txns: WalletTxn[] };

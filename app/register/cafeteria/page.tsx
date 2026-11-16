@@ -39,8 +39,8 @@ export default function CafeteriaRegisterPage() {
       form.set("verificationDocKind2", "Food Handling / Business Registration Certificate");
       await registerWithDocuments(form);
       setSubmitted(true);
-    } catch {
-      setError("Unable to submit registration. Try again.");
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : "Unable to submit registration. Try again.");
     } finally {
       setBusy(false);
     }

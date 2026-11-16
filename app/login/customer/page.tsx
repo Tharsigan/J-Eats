@@ -83,7 +83,7 @@ export default function CustomerLoginPage() {
               Register as customer →
             </Link>
             <span className="mt-2 block text-xs">
-              Demo · student `mira.demo@example.edu` · pending `nimal.pending@sjp.ac.lk` · password 6+ characters.
+              Demo · student `mira.demo@example.edu` · academic `anika.staff@sjp.ac.lk` · non-academic `ruwan.ops@sjp.ac.lk` · pending `nimal.pending@sjp.ac.lk` · any password with 6+ characters. Accounts you register use the password you chose.
             </span>
           </p>
         }
