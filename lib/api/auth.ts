@@ -11,6 +11,9 @@ export type LoginPayload = {
   customerSubRole?: CustomerSubRole;
 };
 
+/** Seeded demo accounts accept any 6+ character password; this one is pre-filled on the login forms. */
+export const DEMO_PASSWORD = "demo123";
+
 /** Inline previews above this size are not persisted (localStorage is ~5MB). */
 const MAX_INLINE_PREVIEW = 400 * 1024;
 
@@ -50,8 +53,14 @@ function strip(user: User & { password?: string }): User {
 export async function login(payload: LoginPayload): Promise<{ user: User; token: string }> {
   if (USE_MOCKS) {
     await delay();
+    if (!payload.identifier.trim()) throw new ApiError(400, "Enter your email or campus ID.");
     if (payload.password.length < 6) {
-      throw new ApiError(401, "Invalid email or password. Check your credentials and try again.");
+      throw new ApiError(
+        401,
+        payload.password
+          ? "Passwords have at least 6 characters. Demo accounts accept any 6+ character password, e.g. demo123."
+          : "Enter your password. Demo accounts accept any 6+ character password, e.g. demo123.",
+      );
     }
     const db = readDb();
     const user = db.users.find((candidate) => {
@@ -78,7 +87,12 @@ export async function login(payload: LoginPayload): Promise<{ user: User; token:
           throw new ApiError(401, `This account is registered as ${label}. Switch to the ${label} tab above.`);
         }
       }
-      throw new ApiError(401, "Invalid email or password. Check your credentials and try again.");
+      throw new ApiError(
+        401,
+        user
+          ? "Incorrect password for this account. Use the password you chose when you registered."
+          : "No account matches that email or ID for this role. Check the demo accounts listed below, or register first.",
+      );
     }
     if (user.status === "suspended") {
       throw new ApiError(403, "This account has been suspended by an administrator. Contact J Eats support.");
@@ -90,7 +104,7 @@ export async function login(payload: LoginPayload): Promise<{ user: User; token:
     if (status !== "approved") {
       throw new ApiError(
         403,
-        "Your documents are still under review. You can sign in after an administrator approves your account.",
+        "Your documents are still under review. You can sign in after an administrator approves your account (demo: use the Admin quick sign-in on the login page and approve it under Pending Approvals).",
       );
     }
     writeDb((d) => logEvent(d, "info", `${user.name} signed in (${user.role})`));

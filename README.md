@@ -13,7 +13,8 @@ Open http://localhost:3000.
 
 ## Demo accounts
 
-Seeded accounts accept **any password with 6+ characters** (e.g. `demo123`). Accounts you register in
+**Fastest:** open `/login` and use the **Quick demo sign-in** buttons (no password). Seeded accounts also accept
+**any password with 6+ characters** (`demo123` is pre-filled). Accounts you register in
 the demo use the password you chose.
 
 | Role | Login | Email |
