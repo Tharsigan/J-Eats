@@ -2,7 +2,7 @@
 
 import { RoleLoginForm } from "@/components/auth/RoleLoginForm";
 import { AuthShell } from "@/components/layout/AuthShell";
-import { login } from "@/lib/api/auth";
+import { DEMO_PASSWORD, login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { ROLE_HOME } from "@/lib/rbac";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -14,7 +14,7 @@ export default function CafeteriaLoginPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
   const [identifier, setIdentifier] = useState("canteen@sjp.ac.lk");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 

@@ -1,3 +1,4 @@
+import { DemoQuickLogin } from "@/components/auth/DemoQuickLogin";
 import { RoleHub } from "@/components/auth/RoleHub";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { Bike, Shield, Store, UtensilsCrossed } from "lucide-react";
@@ -40,12 +41,15 @@ export default function LoginHubPage() {
           },
         ]}
         footer={
+          <>
+          <DemoQuickLogin />
           <p className="mt-5 text-sm text-muted">
             No account yet?{" "}
             <Link href="/register" className="font-semibold text-text">
               Create account →
             </Link>
           </p>
+          </>
         }
       />
     </AuthShell>

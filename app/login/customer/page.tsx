@@ -3,7 +3,7 @@
 import { RoleLoginForm } from "@/components/auth/RoleLoginForm";
 import { AuthShell } from "@/components/layout/AuthShell";
 import { SegmentedControl } from "@/components/ui/SegmentedControl";
-import { login } from "@/lib/api/auth";
+import { DEMO_PASSWORD, login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { ROLE_HOME } from "@/lib/rbac";
 import { useAuthStore } from "@/lib/stores/auth";
@@ -36,7 +36,7 @@ export default function CustomerLoginPage() {
   const [subRole, setSubRole] = useState<CustomerSubRole>("student");
   const copy = useMemo(() => ID_COPY[subRole], [subRole]);
   const [identifier, setIdentifier] = useState(copy.demo);
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 

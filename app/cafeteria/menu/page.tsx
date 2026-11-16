@@ -4,12 +4,14 @@ import { PageIntro } from "@/components/layout/PageIntro";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { ImageUploadField } from "@/components/ui/ImageUploadField";
+import { checkImageFile, IMAGE_ACCEPT, imageFileToDataUrl } from "@/lib/image";
 import { createMenuItem, deleteMenuItem, listMyMenu, patchInventory, type NewMenuItem } from "@/lib/api/cafeteria";
 import { useAction, useApi } from "@/lib/hooks/useApi";
 import type { MenuItem } from "@/lib/types";
 import { formatRs } from "@/lib/utils";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const CATEGORIES = ["Rice & Curry", "Student pick", "Quick bite", "Snacks", "Breakfast", "Burgers", "Pizza", "Cool down"];
 const EMPTY: NewMenuItem = {
@@ -27,7 +29,19 @@ const EMPTY: NewMenuItem = {
 function Row({ item, onError }: { item: MenuItem; onError: (msg: string) => void }) {
   const [price, setPrice] = useState(String(item.price));
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const { busy, run, error } = useAction();
+  const photo = useRef<HTMLInputElement>(null);
+  const { busy, run, error, setError } = useAction();
+
+  async function changePhoto(file: File | undefined) {
+    if (photo.current) photo.current.value = "";
+    if (!file) return;
+    const problem = checkImageFile(file);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    await run("photo", async () => patchInventory(item.id, { image: await imageFileToDataUrl(file) }));
+  }
   useEffect(() => {
     if (error) onError(error);
   }, [error, onError]);
@@ -71,6 +85,17 @@ function Row({ item, onError }: { item: MenuItem; onError: (msg: string) => void
         </Button>
         <Button variant="outline" size="sm" disabled={!!busy} onClick={() => set({ stock: item.stock + 10 }, "stock")}>
           +10
+        </Button>
+        <input
+          ref={photo}
+          type="file"
+          accept={IMAGE_ACCEPT}
+          className="hidden"
+          aria-label={`New photo for ${item.name}`}
+          onChange={(e) => void changePhoto(e.target.files?.[0])}
+        />
+        <Button size="sm" variant="outline" disabled={!!busy} onClick={() => photo.current?.click()}>
+          {busy === "photo" ? "Uploading…" : "Change photo"}
         </Button>
         <Button size="sm" variant={item.available ? "soft" : "primary"} disabled={!!busy} onClick={() => set({ available: !item.available }, "avail")}>
           {item.available ? "Hide" : "Show"}
@@ -173,15 +198,9 @@ export default function MenuOpsPage() {
                 <input className="field" type="number" min={1} value={form.prepMax} onChange={(e) => field("prepMax", Number(e.target.value))} />
               </span>
             </label>
-            <label className="text-sm font-semibold sm:col-span-2">
-              Image URL · optional (images.unsplash.com only)
-              <input
-                className="field mt-1"
-                placeholder="https://images.unsplash.com/photo-…"
-                value={form.image}
-                onChange={(e) => field("image", e.target.value)}
-              />
-            </label>
+            <div className="sm:col-span-2">
+              <ImageUploadField value={form.image ?? ""} onChange={(v) => field("image", v)} />
+            </div>
             <div className="flex gap-2 sm:col-span-2">
               <Button type="submit" disabled={busy === "create"}>
                 {busy === "create" ? "Saving…" : "Publish item"}

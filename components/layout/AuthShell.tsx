@@ -36,12 +36,12 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
           <p className="mt-6 text-xs text-muted">
-            Authentication and matching require backend integration. This is a static design preview.
+            Demo mode · accounts, orders and approvals are simulated and saved in this browser. No backend is required.
           </p>
         </div>
         <div>{children}</div>
       </div>
-      <p className="px-4 pb-6 text-xs text-muted">© 2026 J Eats · Privacy · Terms · Static authentication states</p>
+      <p className="px-4 pb-6 text-xs text-muted">© 2026 J Eats · Privacy · Terms · Demo authentication</p>
     </div>
   );
 }
