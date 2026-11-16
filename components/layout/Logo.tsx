@@ -1,37 +1,87 @@
-import { cn } from "@/lib/utils";
+"use client";
 
-export function Logo({ compact = false, inverted = false }: { compact?: boolean; inverted?: boolean }) {
+import { cn } from "@/lib/utils";
+import { useId, useState } from "react";
+
+function Emblem({ gradientId }: { gradientId: string }) {
   return (
-    <span className="flex items-center gap-2">
+    <svg viewBox="0 0 64 64" className="h-11 w-11" aria-hidden>
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7dd3fc" />
+          <stop offset="55%" stopColor="#34d399" />
+          <stop offset="100%" stopColor="#4ade80" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="30" fill={`url(#${gradientId})`} />
+      <path d="M8 40c8-6 16 2 24-2s16-10 24-4" fill="#166534" opacity="0.9" />
+      <path d="M10 46c10-8 18 0 22-4 8-6 16-2 22 2v8H10z" fill="#14532d" />
+      <ellipse cx="32" cy="22" rx="18" ry="10" fill="white" opacity="0.22" />
+      <text
+        x="32"
+        y="30"
+        textAnchor="middle"
+        fontSize="11"
+        fontWeight="800"
+        fill="#0f172a"
+        fontFamily="ui-sans-serif, system-ui"
+      >
+        J EATS
+      </text>
+    </svg>
+  );
+}
+
+export function Logo({
+  compact = false,
+  inverted = false,
+  className,
+}: {
+  compact?: boolean;
+  inverted?: boolean;
+  className?: string;
+}) {
+  const gradientId = useId().replace(/:/g, "");
+  const [lightFailed, setLightFailed] = useState(false);
+  const [darkFailed, setDarkFailed] = useState(false);
+
+  const showLightImage = !inverted && !lightFailed;
+  const showDarkImage = !darkFailed;
+  const emblemClass =
+    lightFailed && darkFailed
+      ? "block"
+      : lightFailed
+        ? "block dark:hidden"
+        : "hidden dark:block";
+
+  return (
+    <span className={cn("flex items-center gap-2", className)}>
       <span className={cn("relative flex h-11 w-11 items-center justify-center", inverted && "brightness-110")}>
-        <svg viewBox="0 0 64 64" className="h-11 w-11" aria-hidden>
-          <defs>
-            <linearGradient id="jeats-sky" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stopColor="#7dd3fc" />
-              <stop offset="55%" stopColor="#34d399" />
-              <stop offset="100%" stopColor="#4ade80" />
-            </linearGradient>
-          </defs>
-          <circle cx="32" cy="32" r="30" fill="url(#jeats-sky)" />
-          <path
-            d="M8 40c8-6 16 2 24-2s16-10 24-4"
-            fill="#166534"
-            opacity="0.9"
+        {showLightImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/images/logo-light.jpeg"
+            alt=""
+            className="block h-11 w-11 object-contain dark:hidden"
+            onError={() => setLightFailed(true)}
           />
-          <path d="M10 46c10-8 18 0 22-4 8-6 16-2 22 2v8H10z" fill="#14532d" />
-          <ellipse cx="32" cy="22" rx="18" ry="10" fill="white" opacity="0.22" />
-          <text
-            x="32"
-            y="30"
-            textAnchor="middle"
-            fontSize="11"
-            fontWeight="800"
-            fill="#0f172a"
-            fontFamily="ui-sans-serif, system-ui"
-          >
-            J EATS
-          </text>
-        </svg>
+        )}
+        {showDarkImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/images/logo-dark.jpeg"
+            alt=""
+            className={cn("h-11 w-11 object-contain", inverted ? "block" : "hidden dark:block")}
+            onError={() => setDarkFailed(true)}
+          />
+        )}
+        {inverted
+          ? darkFailed && <Emblem gradientId={gradientId} />
+          : (lightFailed || darkFailed) && (
+              <span className={emblemClass}>
+                <Emblem gradientId={gradientId} />
+              </span>
+            )}
       </span>
       {!compact && (
         <span className="leading-tight">

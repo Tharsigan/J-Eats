@@ -2,13 +2,13 @@ import type { Role } from "./types";
 import {
   BarChart3,
   Bike,
+  ClipboardCheck,
   ClipboardList,
   LayoutGrid,
   MapPin,
   ScrollText,
   Settings,
   ShoppingBag,
-  Store,
   UserRound,
   UtensilsCrossed,
   Wallet,
@@ -41,6 +41,7 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   admin: [
     { href: "/admin", label: "Overview", icon: LayoutGrid },
+    { href: "/admin#pending-approvals", label: "Pending Approvals", icon: ClipboardCheck },
     { href: "/admin/ledger", label: "Transactions", icon: ScrollText },
     { href: "/admin/analytics", label: "Reports", icon: BarChart3 },
     { href: "/admin/logs", label: "System Settings", icon: Settings },

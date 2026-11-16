@@ -1,4 +1,6 @@
 export type Role = "customer" | "courier" | "cafeteria" | "admin";
+export type CustomerSubRole = "student" | "academic" | "non-academic";
+export type VerificationStatus = "pending" | "approved" | "rejected";
 
 export type User = {
   id: string;
@@ -6,6 +8,31 @@ export type User = {
   email: string;
   role: Role;
   campusId: string;
+  customerSubRole?: CustomerSubRole;
+  idNumber?: string;
+  verificationStatus?: VerificationStatus;
+  verificationDocUrl?: string;
+  verificationDocName?: string;
+};
+
+export type VerificationDocument = {
+  name: string;
+  url: string;
+  kind: string;
+};
+
+export type VerificationApplication = {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  role: Exclude<Role, "admin">;
+  customerSubRole?: CustomerSubRole;
+  idNumber?: string;
+  extra?: string;
+  documents: VerificationDocument[];
+  verificationStatus: VerificationStatus;
+  submittedAt: string;
 };
 
 export type SpiceLevel = "mild" | "medium" | "hot";
