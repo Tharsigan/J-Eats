@@ -8,6 +8,20 @@ import { releaseOrder } from "./orders";
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80";
 
+const MAX_PHOTO_CHARS = 550_000; // ~400KB of image data once base64-encoded
+
+/** Accept uploaded photos (data URLs) and Unsplash URLs; anything else is rejected. */
+function cleanImage(image: string | undefined) {
+  const v = (image ?? "").trim();
+  if (!v) return "";
+  if (v.startsWith("data:image/")) {
+    if (v.length > MAX_PHOTO_CHARS) throw new ApiError(413, "That photo is too large. Choose a smaller image.");
+    return v;
+  }
+  if (v.startsWith("https://images.unsplash.com/")) return v;
+  throw new ApiError(400, "Upload the photo as a JPG or PNG file.");
+}
+
 function myVendorId(db: MockDb) {
   const { userId } = requireSession();
   const user = db.users.find((u) => u.id === userId);
@@ -70,6 +84,7 @@ export async function patchInventory(id: string, patch: Partial<MenuItem>): Prom
         throw new ApiError(400, "Price must be greater than zero.");
       }
       if (patch.stock !== undefined) patch.stock = Math.max(0, Math.round(patch.stock));
+      if (patch.image !== undefined) patch.image = cleanImage(patch.image) || DEFAULT_IMAGE;
       Object.assign(item, patch);
       if (patch.available !== undefined) {
         logEvent(db, "info", `${item.name} ${item.available ? "shown on" : "hidden from"} the menu`);
@@ -109,7 +124,7 @@ export async function createMenuItem(input: NewMenuItem): Promise<MenuItem> {
         description: input.description.trim() || "Freshly prepared on campus.",
         price: Math.round(input.price),
         currency: "LKR",
-        image: input.image?.trim().startsWith("https://images.unsplash.com/") ? input.image.trim() : DEFAULT_IMAGE,
+        image: cleanImage(input.image) || DEFAULT_IMAGE,
         rating: 0,
         reviewCount: 0,
         prepMinutes: [Math.max(1, input.prepMin), Math.max(input.prepMin, input.prepMax)],
