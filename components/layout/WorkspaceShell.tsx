@@ -88,9 +88,9 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
   );
 
   return (
-    <div className="min-h-screen bg-bg">
-      <header className="sticky top-0 z-40 border-b border-border bg-surface">
-        <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-4 lg:px-6">
+    <div className="min-h-screen bg-bg [--ws-header:4.25rem]">
+      <header className="sticky top-0 z-40 border-b border-border bg-surface lg:h-[var(--ws-header)]">
+        <div className="flex items-center justify-between gap-2 px-4 py-3 sm:gap-4 lg:h-full lg:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border lg:hidden"
@@ -131,7 +131,9 @@ export function WorkspaceShell({ role, children }: { role: Role; children: React
         </div>
       </header>
       <div className="lg:flex">
-        <aside className="hidden w-60 shrink-0 border-r border-border bg-surface px-3 py-6 lg:block">{nav}</aside>
+        <aside className="hidden w-60 shrink-0 border-r border-border bg-surface px-3 py-6 lg:sticky lg:top-[var(--ws-header)] lg:block lg:h-[calc(100vh-var(--ws-header))] lg:self-start lg:overflow-y-auto">
+          {nav}
+        </aside>
         {open && (
           <div className="border-b border-border bg-surface px-4 py-4 lg:hidden">{nav}</div>
         )}
