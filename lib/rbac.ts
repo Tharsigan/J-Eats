@@ -1,4 +1,4 @@
-import type { Role } from "./types";
+import type { Role, VerificationStatus } from "./types";
 
 export const ROLE_HOME: Record<Role, string> = {
   customer: "/customer",
@@ -24,11 +24,18 @@ export function roleFromPath(pathname: string): Role | null {
   return null;
 }
 
-export function canAccess(role: Role, pathname: string) {
+export function isVerified(status: VerificationStatus | undefined | "", role?: Role | null) {
+  if (role === "admin") return true;
+  return (status || "approved") === "approved";
+}
+
+export function canAccess(role: Role, pathname: string, verified?: VerificationStatus | "") {
   const needed = roleFromPath(pathname);
   if (!needed) return true;
-  return needed === role;
+  if (needed !== role) return false;
+  return isVerified(verified, role);
 }
 
 export const AUTH_COOKIE = "jeats-role";
 export const TOKEN_COOKIE = "jeats-token";
+export const VERIFIED_COOKIE = "jeats-verified";

@@ -21,10 +21,11 @@ function readCookie(name: string) {
 /** Flask-ready fetch wrapper. Swap USE_MOCKS off to hit the real REST API. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = readCookie(TOKEN_COOKIE);
+  const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init.headers ?? {}),
     },

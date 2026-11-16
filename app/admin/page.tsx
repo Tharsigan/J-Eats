@@ -1,3 +1,4 @@
+import { PendingApprovals } from "@/components/admin/PendingApprovals";
 import { PageIntro } from "@/components/layout/PageIntro";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -51,7 +52,7 @@ export default function AdminHome() {
           <p className="text-sm text-muted">Sample transaction volume · Today · Gross provider receipts</p>
           <p className="mt-3 text-sm">3 active deliveries</p>
           <p className="note-warn mt-4 rounded-xl px-3 py-2 text-sm">6 rider applications and 2 cafeteria applications need review.</p>
-          <Link href="/admin/logs" className="mt-4 inline-block">
+          <Link href="/admin#pending-approvals" className="mt-4 inline-block">
             <Button>Review pending approvals →</Button>
           </Link>
         </Card>
@@ -127,6 +128,7 @@ export default function AdminHome() {
         </table>
         <p className="mt-3 text-xs text-muted">{ORDERS.length} live sample orders on the board.</p>
       </Card>
+      <PendingApprovals />
     </div>
   );
 }
