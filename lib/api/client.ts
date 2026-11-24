@@ -1,3 +1,4 @@
+import { DB_EVENT } from "../mock-db/db";
 import { TOKEN_COOKIE } from "../rbac";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
@@ -13,7 +14,9 @@ export type LiveFeature =
   | "registration"
   | "approvals"
   | "users"
-  | "menu";
+  | "menu"
+  | "cafeteria"
+  | "orders";
 const LIVE_FEATURES = new Set(
   (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")
     .split(",")
@@ -74,7 +77,12 @@ async function send(path: string, init: RequestInit = {}) {
 /** Flask-ready fetch wrapper. Swap USE_MOCKS off to hit the real REST API. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await send(path, init);
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as T;
+  // Like the mock database's change event: a successful write refreshes every view that uses useApi().
+  if ((init.method ?? "GET").toUpperCase() !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(DB_EVENT));
+  }
+  return data;
 }
 
 /** apiFetch for "get one" calls: a 404 becomes `undefined`, like the mock's `find()`. */

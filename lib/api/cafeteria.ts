@@ -2,7 +2,7 @@ import { readDb, writeDb, type MockDb } from "../mock-db/db";
 import { logEvent, notify } from "../mock-db/events";
 import type { CourierJob, InventoryRow, MenuItem, Order, OrderStatus, Vendor } from "../types";
 import { delay, formatRs, uid } from "../utils";
-import { ApiError, apiFetch, requireSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, isLive, requireSession } from "./client";
 import { releaseOrder } from "./orders";
 
 const DEFAULT_IMAGE =
@@ -35,7 +35,7 @@ function toRow(m: MenuItem): InventoryRow {
 }
 
 export async function getMyVendor(): Promise<Vendor | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     const db = readDb();
     const id = myVendorId(db);
     return db.vendors.find((v) => v.id === id);
@@ -44,7 +44,7 @@ export async function getMyVendor(): Promise<Vendor | undefined> {
 }
 
 export async function updateMyVendor(patch: Partial<Pick<Vendor, "openNow" | "closesAt" | "location">>): Promise<Vendor> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     return writeDb((db) => {
       const id = myVendorId(db);
       const vendor = db.vendors.find((v) => v.id === id)!;
@@ -58,7 +58,7 @@ export async function updateMyVendor(patch: Partial<Pick<Vendor, "openNow" | "cl
 
 /** Full menu rows for the signed-in cafeteria (used by Menu Management). */
 export async function listMyMenu(): Promise<MenuItem[]> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     await delay(120);
     const db = readDb();
     const id = myVendorId(db);
@@ -68,14 +68,14 @@ export async function listMyMenu(): Promise<MenuItem[]> {
 }
 
 export async function getInventory(): Promise<InventoryRow[]> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     return (await listMyMenu()).map(toRow);
   }
   return apiFetch("/cafeteria/inventory");
 }
 
 export async function patchInventory(id: string, patch: Partial<MenuItem>): Promise<InventoryRow | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     return writeDb((db) => {
       const vendorId = myVendorId(db);
       const item = db.menu.find((m) => m.id === id && m.vendorId === vendorId);
@@ -109,7 +109,7 @@ export type NewMenuItem = {
 };
 
 export async function createMenuItem(input: NewMenuItem): Promise<MenuItem> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     await delay(200);
     return writeDb((db) => {
       const vendorId = myVendorId(db);
@@ -146,7 +146,7 @@ export async function createMenuItem(input: NewMenuItem): Promise<MenuItem> {
 }
 
 export async function deleteMenuItem(id: string): Promise<{ ok: boolean }> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     return writeDb((db) => {
       const vendorId = myVendorId(db);
       const item = db.menu.find((m) => m.id === id && m.vendorId === vendorId);
@@ -161,7 +161,7 @@ export async function deleteMenuItem(id: string): Promise<{ ok: boolean }> {
 
 /** Orders placed with the signed-in cafeteria. */
 export async function incomingOrders(): Promise<Order[]> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(120);
     const db = readDb();
     const id = myVendorId(db);
@@ -190,7 +190,7 @@ const CUSTOMER_COPY: Partial<Record<OrderStatus, string>> = {
  * ready, a courier job is opened so riders can claim it.
  */
 export async function advanceOrder(id: string, next?: OrderStatus): Promise<Order> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(200);
     return writeDb((db) => {
       const vendorId = myVendorId(db);
@@ -243,7 +243,7 @@ export async function advanceOrder(id: string, next?: OrderStatus): Promise<Orde
 }
 
 export async function rejectOrder(id: string, reason: string): Promise<Order> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(200);
     return writeDb((db) => {
       const vendorId = myVendorId(db);
@@ -270,7 +270,7 @@ export async function rejectOrder(id: string, reason: string): Promise<Order> {
 }
 
 export async function broadcastQueue(n: number): Promise<{ queueLength: number }> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     return writeDb((db) => {
       const vendorId = myVendorId(db);
       db.queues[vendorId] = Math.max(0, Math.round(n));
@@ -284,7 +284,7 @@ export async function broadcastQueue(n: number): Promise<{ queueLength: number }
 }
 
 export async function getQueue(): Promise<{ queueLength: number }> {
-  if (USE_MOCKS) {
+  if (!isLive("cafeteria")) {
     const db = readDb();
     return { queueLength: db.queues[myVendorId(db)] ?? 0 };
   }
@@ -323,7 +323,7 @@ export function hourBuckets(orders: Order[]) {
 }
 
 export async function getVendorStats(range: StatsRange): Promise<VendorStats> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(100);
     const db = readDb();
     const vendorId = myVendorId(db);

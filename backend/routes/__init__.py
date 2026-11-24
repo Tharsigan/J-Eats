@@ -7,6 +7,7 @@ from flask import Flask
 
 from .admin import bp as admin_bp
 from .auth import bp as auth_bp
+from .cafeteria import bp as cafeteria_bp
 from .health import bp as health_bp
 from .menu import bp as menu_bp
 
@@ -16,3 +17,4 @@ def register_routes(app: Flask) -> None:
     app.register_blueprint(auth_bp, url_prefix="/api")
     app.register_blueprint(admin_bp, url_prefix="/api")
     app.register_blueprint(menu_bp, url_prefix="/api")
+    app.register_blueprint(cafeteria_bp, url_prefix="/api")
