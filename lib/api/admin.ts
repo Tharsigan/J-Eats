@@ -139,7 +139,7 @@ export async function fetchVerificationDocument(url: string): Promise<Blob> {
 }
 
 export async function listUsers(): Promise<User[]> {
-  if (USE_MOCKS) {
+  if (!isLive("users")) {
     await delay(100);
     return readDb().users.map(({ password: _p, ...u }) => {
       void _p;
@@ -150,7 +150,7 @@ export async function listUsers(): Promise<User[]> {
 }
 
 export async function setUserStatus(id: string, status: "active" | "suspended"): Promise<User> {
-  if (USE_MOCKS) {
+  if (!isLive("users")) {
     await delay(150);
     return writeDb((db) => {
       const user = db.users.find((u) => u.id === id);

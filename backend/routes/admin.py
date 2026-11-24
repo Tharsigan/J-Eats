@@ -3,6 +3,8 @@
 GET  /api/admin/approvals              -> every application, pending first
 POST /api/admin/approvals/<id>         {status: "approved" | "rejected"}
 GET  /api/admin/documents/<doc_id>     -> the uploaded file (admins only)
+GET  /api/admin/users                  -> every account (no password hashes)
+POST /api/admin/users/<id>/status      {status: "active" | "suspended"}
 """
 import uuid
 from datetime import datetime, timezone
@@ -12,7 +14,7 @@ from flask import Blueprint, jsonify, request, send_file
 import uploads
 from auth import current_user, require_role
 from db import query, query_one, transaction
-from serializers import iso
+from serializers import iso, user_json
 
 bp = Blueprint("admin", __name__)
 
@@ -186,3 +188,40 @@ def download_document(doc_id: int):
     resp.headers["X-Content-Type-Options"] = "nosniff"
     resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'"
     return resp
+
+
+# ---------------------------------------------------------------- users
+@bp.get("/admin/users")
+@require_role("admin")
+def list_users():
+    rows = query("SELECT * FROM users ORDER BY created_at, id")
+    return jsonify([user_json(r) for r in rows])
+
+
+@bp.post("/admin/users/<user_id>/status")
+@require_role("admin")
+def set_user_status(user_id: str):
+    status = (request.get_json(silent=True) or {}).get("status")
+    if status not in ("active", "suspended"):
+        return _error(400, 'Status must be "active" or "suspended".')
+    admin = current_user()
+    with transaction() as tx:
+        user = tx.query_one("SELECT * FROM users WHERE id = %s FOR UPDATE", (user_id,))
+        if not user:
+            return _error(404, "User not found.")
+        if user["role"] == "admin":
+            return _error(403, "Administrator accounts cannot be suspended here.")
+        if user["status"] != status:
+            tx.execute("UPDATE users SET status = %s WHERE id = %s", (status, user_id))
+            verb = "suspended" if status == "suspended" else "reactivated"
+            tx.execute(
+                "INSERT INTO system_logs (id, level, message, created_at) VALUES (%s, %s, %s, %s)",
+                (
+                    _id("log"),
+                    "warn" if status == "suspended" else "ok",
+                    f"Admin {verb} {user['name']} ({user['role']}) (by {admin['email']})",
+                    _utcnow(),
+                ),
+            )
+        user = tx.query_one("SELECT * FROM users WHERE id = %s", (user_id,))
+    return jsonify(user_json(user))
