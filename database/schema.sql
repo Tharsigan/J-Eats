@@ -70,6 +70,7 @@ CREATE TABLE users (
   phone                VARCHAR(20)   NULL,
   verification_status  ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
   status               ENUM('active','suspended') NOT NULL DEFAULT 'active',
+  is_online            BOOLEAN       NOT NULL DEFAULT TRUE,   -- riders: Online / Offline switch
   vendor_id            VARCHAR(36)   NULL,
   created_at           DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -126,6 +127,8 @@ CREATE TABLE menu_items (
   stock          INT            NOT NULL DEFAULT 0,
   max_per_order  INT            NOT NULL DEFAULT 5,
   allergens      VARCHAR(255)   NULL,
+  tag            VARCHAR(60)    NULL,                   -- card label, e.g. "Student pick"
+  featured       BOOLEAN        NOT NULL DEFAULT FALSE, -- "Campus favourite" badge
   available      BOOLEAN        NOT NULL DEFAULT TRUE,
   PRIMARY KEY (id),
   UNIQUE KEY uq_menu_slug (slug),

@@ -26,6 +26,9 @@ class Config:
     DB_PASSWORD = os.getenv("DB_PASSWORD", "")
     DB_NAME = os.getenv("DB_NAME", "j_eats")
 
+    # Campus time zone: "today", time slots and stats use this.
+    TIMEZONE = os.getenv("TIMEZONE", "Asia/Colombo")
+
     # Which websites may call this API from the browser (the Next.js app)
     FRONTEND_ORIGINS = [
         o.strip()

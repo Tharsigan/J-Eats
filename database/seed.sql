@@ -62,6 +62,15 @@ INSERT INTO menu_items (id, vendor_id, name, slug, category, description, price,
   ('m_garden', 'v_gb', 'Garden Rice & Curry', 'garden-rice-curry', 'Rice & Curry', 'Seasonal vegetables, dhal and coconut sambol on steamed rice.', 650, 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=900&q=80', 4.6, 58, 12, 16, 14, 8, 'may contain traces of nuts.', TRUE),
   ('m_wrap', 'v_gb', 'Grilled Chicken Wrap', 'grilled-chicken-wrap', 'Snacks', 'Charred chicken, greens and yoghurt dressing in a warm wrap.', 780, 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?auto=format&fit=crop&w=900&q=80', 4.5, 36, 10, 15, 9, 6, 'contains gluten and dairy.', TRUE);
 
+-- Card labels and the "Campus favourite" badge (same as lib/mock-data/campus.ts).
+UPDATE menu_items SET tag = 'Campus favourite', featured = TRUE WHERE id = 'm_rice_curry';
+UPDATE menu_items SET tag = 'Student pick', featured = TRUE WHERE id = 'm_kottu';
+UPDATE menu_items SET tag = 'Quick bite' WHERE id IN ('m_rolls', 'm_wrap');
+UPDATE menu_items SET tag = 'Cool down' WHERE id = 'm_choco';
+UPDATE menu_items SET tag = 'Sold out soon' WHERE id = 'm_stringhop';
+UPDATE menu_items SET tag = 'Student bite' WHERE id = 'm_burger';
+UPDATE menu_items SET tag = 'Vegetarian' WHERE id IN ('m_pizza', 'm_garden');
+
 INSERT INTO wallets (user_id, balance) VALUES
   ('u_cus', 2500),
   ('u_cus_ac', 1500),

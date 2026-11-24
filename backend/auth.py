@@ -144,3 +144,18 @@ def require_role(*roles: str):
         return wrapper
 
     return decorator
+
+
+def optional_user() -> dict | None:
+    """The signed-in, active user if a valid token was sent, else None (for public pages)."""
+    token = _bearer_token()
+    if not token:
+        return None
+    try:
+        claims = decode_token(token)
+    except jwt.InvalidTokenError:
+        return None
+    user = query_one("SELECT * FROM users WHERE id = %s", (claims["sub"],))
+    if not user or user["role"] != claims["role"] or user["status"] == "suspended":
+        return None
+    return user

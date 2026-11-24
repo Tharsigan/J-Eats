@@ -109,7 +109,7 @@ app keeps its mock data, create `.env.local` in the project root with:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 NEXT_PUBLIC_USE_MOCKS=true
-NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users
+NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users,menu
 ```
 
 Restart `npm run dev` after changing it. Sign in with the seeded accounts and
@@ -126,6 +126,11 @@ their real password, `demo123` (the quick demo buttons do this for you).
 | GET | `/api/admin/approvals` | admin | every application, pending first |
 | POST | `/api/admin/approvals/<id>` | admin | `{status: "approved" \| "rejected"}`; pending applications only |
 | GET | `/api/admin/documents/<id>` | admin | an uploaded verification document |
+| GET | `/api/menu`, `/api/menu/<id or slug>`, `/api/menu/<id>/related` | anyone | menu items |
+| GET / POST | `/api/menu/<id>/reviews`, GET `/api/reviews` | anyone / customer | reviews (posting updates the item's rating) |
+| GET | `/api/vendors`, `/api/vendors/<id>` | anyone | cafeterias and their queue length |
+| GET | `/api/slots?date=yyyy-mm-dd` | anyone | pickup / delivery slots (6 orders per slot) |
+| GET / POST | `/api/favourites`, `/api/favourites/<item_id>` | signed in | list / toggle favourites |
 | GET | `/api/admin/users` | admin | every account (never password hashes) |
 | POST | `/api/admin/users/<id>/status` | admin | `{status: "active" \| "suspended"}`; admins can't be suspended |
 

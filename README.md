@@ -45,7 +45,7 @@ restores the original seed.
 
 - `lib/api/*` — the only data layer used by the UI. Each function has a mock branch and an `apiFetch(...)` REST call.
   Set `NEXT_PUBLIC_USE_MOCKS=false` and `NEXT_PUBLIC_API_URL` to point the app at the Flask API.
-- `NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users` switches sign-in, registration, admin approvals and the admin Users page
+- `NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users,menu` switches the listed features (sign-in, registration, admin approvals, admin Users, menu and browsing)
   to the Flask API + MariaDB (see `backend/README.md`), while everything else keeps using the mock database.
 - `lib/mock-db/` — the localStorage-backed mock database (seeded from `lib/mock-data/campus.ts`) plus workflow helpers
   (notifications, ledger, wallet, activity log). Never imported by UI components.

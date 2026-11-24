@@ -8,7 +8,12 @@ const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
  * NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users
  * Everything not listed keeps using the browser mock database.
  */
-export type LiveFeature = "auth" | "registration" | "approvals" | "users";
+export type LiveFeature =
+  | "auth"
+  | "registration"
+  | "approvals"
+  | "users"
+  | "menu";
 const LIVE_FEATURES = new Set(
   (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")
     .split(",")
@@ -70,6 +75,16 @@ async function send(path: string, init: RequestInit = {}) {
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await send(path, init);
   return res.json() as Promise<T>;
+}
+
+/** apiFetch for "get one" calls: a 404 becomes `undefined`, like the mock's `find()`. */
+export async function apiFetchOptional<T>(path: string): Promise<T | undefined> {
+  try {
+    return await apiFetch<T>(path);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return undefined;
+    throw err;
+  }
 }
 
 /** Like apiFetch, but for files (e.g. verification documents) that need the sign-in token. */

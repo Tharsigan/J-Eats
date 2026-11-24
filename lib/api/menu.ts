@@ -2,10 +2,10 @@ import { readDb, writeDb } from "../mock-db/db";
 import { logEvent, notifyVendor } from "../mock-db/events";
 import type { MenuItem, Review, TimeSlot, Vendor } from "../types";
 import { delay, uid } from "../utils";
-import { ApiError, apiFetch, currentSession, requireSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, apiFetchOptional, currentSession, isLive, requireSession } from "./client";
 
 export async function listMenu(): Promise<MenuItem[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     await delay(120);
     return [...readDb().menu];
   }
@@ -13,15 +13,15 @@ export async function listMenu(): Promise<MenuItem[]> {
 }
 
 export async function getMenuItem(id: string): Promise<MenuItem | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     await delay(60);
     return readDb().menu.find((m) => m.id === id || m.slug === id);
   }
-  return apiFetch(`/menu/${id}`);
+  return apiFetchOptional<MenuItem>(`/menu/${encodeURIComponent(id)}`);
 }
 
 export async function listVendors(): Promise<(Vendor & { queue: number })[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     const db = readDb();
     return db.vendors.map((v) => ({ ...v, queue: db.queues[v.id] ?? 0 }));
   }
@@ -29,14 +29,14 @@ export async function listVendors(): Promise<(Vendor & { queue: number })[]> {
 }
 
 export async function getVendor(id: string): Promise<Vendor | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     return readDb().vendors.find((v) => v.id === id);
   }
-  return apiFetch(`/vendors/${id}`);
+  return apiFetchOptional<Vendor>(`/vendors/${encodeURIComponent(id)}`);
 }
 
 export async function listReviews(itemId?: string): Promise<Review[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     await delay(60);
     const reviews = readDb().reviews.filter((r) => !itemId || r.itemId === itemId);
     return [...reviews].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
@@ -57,7 +57,7 @@ export function slotLabel(time: string) {
  * that already hold 6+ orders are unavailable.
  */
 export async function listSlots(date?: string): Promise<TimeSlot[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     await delay(40);
     const db = readDb();
     const now = new Date();
@@ -82,7 +82,7 @@ export async function listSlots(date?: string): Promise<TimeSlot[]> {
 }
 
 export async function listRelated(itemId: string): Promise<MenuItem[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     const menu = readDb().menu;
     const item = menu.find((m) => m.id === itemId);
     return menu
@@ -99,7 +99,7 @@ export async function addReview(input: {
   body: string;
   orderId?: string;
 }): Promise<Review> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     await delay(200);
     const { userId } = requireSession();
     return writeDb((db) => {
@@ -141,7 +141,7 @@ export async function addReview(input: {
 }
 
 export async function listFavourites(): Promise<string[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     const session = currentSession();
     if (!session) return [];
     return readDb().favourites[session.userId] ?? [];
@@ -150,7 +150,7 @@ export async function listFavourites(): Promise<string[]> {
 }
 
 export async function toggleFavourite(itemId: string): Promise<string[]> {
-  if (USE_MOCKS) {
+  if (!isLive("menu")) {
     const session = currentSession();
     if (!session) throw new ApiError(401, "Sign in to save favourites.");
     return writeDb((db) => {
