@@ -5,13 +5,13 @@ GET  /api/admin/logs
 GET  /api/admin/analytics/peak?range=today|week|month
 GET  /api/admin/orders
 GET  /api/admin/stats?range=today|week|month
-GET  /api/admin/settings
+GET  /api/admin/settings   (any signed-in user: checkout needs the fee and cash cutoff)
 PUT  /api/admin/settings   {deliveryFee, riderPayout, cashCutoffHour, orderingOpen, maxActiveJobsPerRider}
 POST /api/admin/reset      refused: the browser demo reset never touches MariaDB
 """
 from flask import Blueprint, jsonify, request
 
-from auth import require_role
+from auth import require_auth, require_role
 from common import error, has_column, log_event, money, notify, rs, settings
 from db import query, transaction
 from serializers import iso
@@ -138,8 +138,9 @@ def stats():
 
 
 @bp.get("/admin/settings")
-@require_role("admin")
+@require_auth
 def get_settings():
+    # Read-only for every signed-in user: checkout shows the delivery fee and cash cutoff.
     return jsonify(settings_json(settings()))
 
 

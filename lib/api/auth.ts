@@ -2,7 +2,7 @@ import { readDb, writeDb } from "../mock-db/db";
 import { logEvent, notify } from "../mock-db/events";
 import type { CustomerSubRole, Role, User, VerificationApplication, VerificationDocument } from "../types";
 import { delay, uid } from "../utils";
-import { ApiError, apiFetch, currentSession, isLive, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, currentSession, isLive } from "./client";
 
 export type LoginPayload = {
   role: Role;
@@ -213,7 +213,7 @@ export async function registerWithDocuments(formData: FormData): Promise<{ statu
 
 /** Demo password reset: confirms the account exists. No email is sent. */
 export async function requestPasswordReset(email: string): Promise<{ ok: boolean }> {
-  if (USE_MOCKS) {
+  if (!isLive("auth")) {
     await delay();
     const user = readDb().users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
     if (!user) throw new ApiError(404, "No J Eats account uses that email address.");

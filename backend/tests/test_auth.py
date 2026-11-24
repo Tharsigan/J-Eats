@@ -114,3 +114,10 @@ def test_production_refuses_to_start_without_a_jwt_secret():
 
     with pytest.raises(RuntimeError):
         create_app(Prod)
+
+
+def test_forgot_password_confirms_the_account(client, sql):
+    assert client.post("/api/auth/forgot-password", json={"email": "Mira.Demo@example.edu"}).get_json() == {"ok": True}
+    assert sql("SELECT COUNT(*) n FROM system_logs WHERE message='Password reset requested for mira.demo@example.edu'")[0]["n"] == 1
+    assert client.post("/api/auth/forgot-password", json={"email": "nobody@example.edu"}).status_code == 404
+    assert client.post("/api/auth/forgot-password", json={"email": "nope"}).status_code == 400

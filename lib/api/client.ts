@@ -28,6 +28,11 @@ const LIVE_FEATURES = new Set(
     .filter(Boolean),
 );
 
+/** True when any feature calls Flask, so views should poll for other people's changes. */
+export function anyLive() {
+  return !USE_MOCKS || LIVE_FEATURES.size > 0;
+}
+
 /** True when `feature` should call Flask: all features with USE_MOCKS=false, or the ones listed in LIVE_FEATURES. */
 export function isLive(feature: LiveFeature) {
   return !USE_MOCKS || LIVE_FEATURES.has(feature);

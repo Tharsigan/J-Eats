@@ -1,7 +1,7 @@
 "use client";
 
 import { DB_EVENT } from "../mock-db/db";
-import { USE_MOCKS } from "../api/client";
+import { anyLive } from "../api/client";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type State<T> = { data: T | undefined; error: string; loading: boolean };
@@ -11,7 +11,8 @@ type State<T> = { data: T | undefined; error: string; loading: boolean };
  *
  * In mock mode every write to the demo database broadcasts an event, so all
  * mounted views (and other tabs) refetch and stay in sync. Against the real
- * Flask API the hook falls back to polling every `pollMs` milliseconds.
+ * Flask API (any NEXT_PUBLIC_LIVE_FEATURES, or USE_MOCKS=false) it also polls
+ * every `pollMs` milliseconds, so changes made by other users show up.
  */
 export function useApi<T>(fetcher: () => Promise<T>, deps: readonly unknown[] = [], pollMs = 15_000) {
   const [state, setState] = useState<State<T>>({ data: undefined, error: "", loading: true });
@@ -39,7 +40,7 @@ export function useApi<T>(fetcher: () => Promise<T>, deps: readonly unknown[] = 
     void reload();
     const onChange = () => void reload();
     window.addEventListener(DB_EVENT, onChange);
-    const timer = USE_MOCKS ? undefined : window.setInterval(onChange, pollMs);
+    const timer = anyLive() ? window.setInterval(onChange, pollMs) : undefined;
     return () => {
       window.removeEventListener(DB_EVENT, onChange);
       if (timer) window.clearInterval(timer);

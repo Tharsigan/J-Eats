@@ -2,7 +2,10 @@ from conftest import login
 
 
 def test_admin_only(client, customer_headers):
-    for path in ("/api/admin/ledger", "/api/admin/logs", "/api/admin/stats", "/api/admin/settings", "/api/admin/orders",
+    assert client.get("/api/admin/settings").status_code == 401
+    assert client.get("/api/admin/settings", headers=customer_headers).get_json()["cashCutoffHour"] == 11
+    assert client.put("/api/admin/settings", json={}, headers=customer_headers).status_code == 403
+    for path in ("/api/admin/ledger", "/api/admin/logs", "/api/admin/stats", "/api/admin/orders",
                  "/api/admin/analytics/peak"):
         assert client.get(path).status_code == 401
         assert client.get(path, headers=customer_headers).status_code == 403
