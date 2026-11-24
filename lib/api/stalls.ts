@@ -2,10 +2,10 @@ import { readDb, writeDb } from "../mock-db/db";
 import { addLedger, logEvent, walletFor, walletTxn } from "../mock-db/events";
 import type { Stall } from "../types";
 import { delay, formatRs } from "../utils";
-import { ApiError, apiFetch, requireSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, isLive, requireSession } from "./client";
 
 export async function listStalls(): Promise<Stall[]> {
-  if (USE_MOCKS) {
+  if (!isLive("wallet")) {
     await delay(60);
     return [...readDb().stalls];
   }
@@ -14,7 +14,7 @@ export async function listStalls(): Promise<Stall[]> {
 
 /** Contribute to a faculty fundraising stall from the customer wallet (simulated). */
 export async function supportStall(id: string, amount: number): Promise<Stall> {
-  if (USE_MOCKS) {
+  if (!isLive("wallet")) {
     await delay(250);
     const { userId } = requireSession();
     return writeDb((db) => {

@@ -16,6 +16,7 @@ export type LiveFeature =
   | "users"
   | "menu"
   | "cafeteria"
+  | "wallet"
   | "orders";
 const LIVE_FEATURES = new Set(
   (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")

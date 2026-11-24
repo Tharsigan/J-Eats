@@ -94,3 +94,53 @@ def short_name(name: str) -> str:
     """'Nethmi Perera' -> 'Nethmi P.' (how reviews and orders show a customer)."""
     parts = (name or "").split()
     return f"{parts[0]} {parts[-1][0]}." if len(parts) > 1 else (name or "")
+
+
+# ---------------------------------------------------------------- money
+class InsufficientFunds(Exception):
+    pass
+
+
+def short_ref(prefix: str) -> str:
+    import secrets
+
+    return f"{prefix}-{secrets.token_hex(3).upper()}"
+
+
+def lock_wallet(tx, user_id: str) -> dict:
+    """Create the wallet if needed and lock it for the rest of the transaction."""
+    tx.execute("INSERT IGNORE INTO wallets (user_id, balance) VALUES (%s, 0)", (user_id,))
+    return tx.query_one("SELECT * FROM wallets WHERE user_id = %s FOR UPDATE", (user_id,))
+
+
+def wallet_txn(tx, user_id: str, *, label: str, amount, type: str, kind: str, ref: str | None = None) -> float:
+    """Credit or debit a wallet and record the transaction. Returns the new balance.
+
+    Raises InsufficientFunds (nothing written) when a debit is larger than the balance.
+    """
+    wallet = lock_wallet(tx, user_id)
+    amount = round(float(amount), 2)
+    balance = float(wallet["balance"])
+    new_balance = round(balance + amount if type == "credit" else balance - amount, 2)
+    if new_balance < 0:
+        raise InsufficientFunds()
+    tx.execute("UPDATE wallets SET balance = %s WHERE user_id = %s", (new_balance, user_id))
+    tx.execute(
+        """INSERT INTO wallet_transactions (id, user_id, label, amount, type, kind, ref, created_at)
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        (new_id("w"), user_id, label[:160], amount, type, kind, ref, utcnow()),
+    )
+    return new_balance
+
+
+def add_ledger(tx, *, ref: str, party: str, amount, type: str) -> None:
+    tx.execute(
+        "INSERT INTO ledger_entries (id, ref, party, amount, type, created_at) VALUES (%s, %s, %s, %s, %s, %s)",
+        (new_id("l"), ref[:40], (party or "")[:120], round(float(amount), 2), type, utcnow()),
+    )
+
+
+def rs(amount) -> str:
+    """Rs. 1,250 (how the frontend's formatRs shows money)."""
+    f = float(amount)
+    return f"Rs. {f:,.0f}" if f.is_integer() else f"Rs. {f:,.2f}"

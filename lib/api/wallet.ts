@@ -2,13 +2,13 @@ import { readDb, writeDb } from "../mock-db/db";
 import { addLedger, logEvent, notify, walletFor, walletTxn } from "../mock-db/events";
 import type { Wallet } from "../types";
 import { delay, formatRs } from "../utils";
-import { ApiError, apiFetch, requireSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, isLive, requireSession } from "./client";
 
 export const TOPUP_MIN = 100;
 export const TOPUP_MAX = 50_000;
 
 export async function getWallet(): Promise<Wallet> {
-  if (USE_MOCKS) {
+  if (!isLive("wallet")) {
     await delay(60);
     const { userId } = requireSession();
     const wallet = readDb().wallets[userId];
@@ -24,7 +24,7 @@ export async function getWallet(): Promise<Wallet> {
 export type TopUpResult = { ok: boolean; amount: number; ref: string; balance: number };
 
 export async function requestTopUp(amount: number, method = "Demo gateway"): Promise<TopUpResult> {
-  if (USE_MOCKS) {
+  if (!isLive("wallet")) {
     await delay(500);
     const { userId } = requireSession();
     if (!Number.isFinite(amount) || amount < TOPUP_MIN || amount > TOPUP_MAX) {
@@ -40,5 +40,5 @@ export async function requestTopUp(amount: number, method = "Demo gateway"): Pro
       return { ok: true, amount, ref, balance: walletFor(db, userId).balance };
     });
   }
-  return apiFetch("/wallet/topup", { method: "POST", body: JSON.stringify({ amount }) });
+  return apiFetch("/wallet/topup", { method: "POST", body: JSON.stringify({ amount, method }) });
 }
