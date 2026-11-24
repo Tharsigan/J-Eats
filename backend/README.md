@@ -109,7 +109,7 @@ app keeps its mock data, create `.env.local` in the project root with:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
 NEXT_PUBLIC_USE_MOCKS=true
-NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals
+NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users
 ```
 
 Restart `npm run dev` after changing it. Sign in with the seeded accounts and
@@ -126,6 +126,8 @@ their real password, `demo123` (the quick demo buttons do this for you).
 | GET | `/api/admin/approvals` | admin | every application, pending first |
 | POST | `/api/admin/approvals/<id>` | admin | `{status: "approved" \| "rejected"}`; pending applications only |
 | GET | `/api/admin/documents/<id>` | admin | an uploaded verification document |
+| GET | `/api/admin/users` | admin | every account (never password hashes) |
+| POST | `/api/admin/users/<id>/status` | admin | `{status: "active" \| "suspended"}`; admins can't be suspended |
 
 Send the token as `Authorization: Bearer <token>`. Tokens expire after
 `JWT_EXPIRES_MINUTES`. Every request re-reads the user from the database, so

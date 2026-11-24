@@ -12,7 +12,7 @@ import { useMemo, useState } from "react";
 const ROLE_LABEL: Record<Role, string> = { customer: "Customer", courier: "Rider", cafeteria: "Cafeteria", admin: "Admin" };
 
 export default function AdminUsersPage() {
-  const { data: users, loading } = useApi(listUsers);
+  const { data: users, loading, reload } = useApi(listUsers);
   const [q, setQ] = useState("");
   const [role, setRole] = useState<Role | "all">("all");
   const [status, setStatus] = useState<"all" | "approved" | "pending" | "rejected" | "suspended">("all");
@@ -123,7 +123,10 @@ export default function AdminUsersPage() {
                         variant={suspended ? "primary" : "outline"}
                         disabled={busy === u.id}
                         onClick={() =>
-                          void run(u.id, () => setUserStatus(u.id, suspended ? "active" : "suspended"), `${u.name} ${suspended ? "reactivated" : "suspended"}.`)
+                          void run(u.id, () => setUserStatus(u.id, suspended ? "active" : "suspended"), `${u.name} ${suspended ? "reactivated" : "suspended"}.`).then(
+                            // The mock database refreshes views by itself; the real API needs an explicit reload.
+                            () => void reload(),
+                          )
                         }
                       >
                         {suspended ? "Reactivate" : "Suspend"}

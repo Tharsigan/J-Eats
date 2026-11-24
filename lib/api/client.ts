@@ -5,10 +5,10 @@ const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
 
 /**
  * Features that use the real Flask API even while USE_MOCKS is on, e.g.
- * NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals
+ * NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users
  * Everything not listed keeps using the browser mock database.
  */
-export type LiveFeature = "auth" | "registration" | "approvals";
+export type LiveFeature = "auth" | "registration" | "approvals" | "users";
 const LIVE_FEATURES = new Set(
   (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")
     .split(",")
