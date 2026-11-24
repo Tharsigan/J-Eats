@@ -33,8 +33,19 @@ class Config:
         if o.strip()
     ]
 
-    # Phase 2 placeholders
-    JWT_SECRET = os.getenv("JWT_SECRET", "change-me-to-a-long-random-string")
+    # Login tokens (JWT). Set JWT_SECRET in .env to a long random string, e.g.
+    #   python -c "import secrets; print(secrets.token_urlsafe(48))"
+    JWT_SECRET = os.getenv("JWT_SECRET", "")
+    JWT_EXPIRES_MINUTES = int(os.getenv("JWT_EXPIRES_MINUTES", "480"))  # 8 hours
+
+    # Verification documents uploaded at registration. Stored outside the
+    # web root and only served to signed-in admins.
+    UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", str(Path(__file__).with_name("uploads")))
+    MAX_DOCUMENT_MB = int(os.getenv("MAX_DOCUMENT_MB", "5"))
+    # Flask rejects any request body larger than this (two documents + form fields).
+    MAX_CONTENT_LENGTH = (2 * MAX_DOCUMENT_MB + 1) * 1024 * 1024
+
+    # Other Phase 2 placeholders
     STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
     STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")

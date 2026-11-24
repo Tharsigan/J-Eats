@@ -2,7 +2,7 @@ import { readDb, writeDb } from "../mock-db/db";
 import { logEvent, notify } from "../mock-db/events";
 import type { CustomerSubRole, Role, User, VerificationApplication, VerificationDocument } from "../types";
 import { delay, uid } from "../utils";
-import { ApiError, apiFetch, currentSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, currentSession, isLive, USE_MOCKS } from "./client";
 
 export type LoginPayload = {
   role: Role;
@@ -51,7 +51,7 @@ function strip(user: User & { password?: string }): User {
 }
 
 export async function login(payload: LoginPayload): Promise<{ user: User; token: string }> {
-  if (USE_MOCKS) {
+  if (!isLive("auth")) {
     await delay();
     if (!payload.identifier.trim()) throw new ApiError(400, "Enter your email or campus ID.");
     if (payload.password.length < 6) {
@@ -116,8 +116,16 @@ export async function login(payload: LoginPayload): Promise<{ user: User; token:
   });
 }
 
+/** Seeded demo accounts used by the quick sign-in buttons (see database/seed.sql). */
+const DEMO_ACCOUNTS: Record<Role, Pick<LoginPayload, "identifier" | "customerSubRole">> = {
+  customer: { identifier: "mira.demo@example.edu", customerSubRole: "student" },
+  courier: { identifier: "ari@sjp.ac.lk" },
+  cafeteria: { identifier: "canteen@sjp.ac.lk" },
+  admin: { identifier: "admin@jeats.lk" },
+};
+
 export async function loginAsRole(role: Role): Promise<{ user: User; token: string }> {
-  if (USE_MOCKS) {
+  if (!isLive("auth")) {
     await delay();
     const users = readDb().users;
     const user =
@@ -125,14 +133,13 @@ export async function loginAsRole(role: Role): Promise<{ user: User; token: stri
       users.find((u) => u.role === role)!;
     return { user: strip(user), token: `mock.${role}.${user.id}` };
   }
-  return apiFetch("/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ role }),
-  });
+  // Against the real API there is no password-free sign-in: use the seeded demo
+  // account and its password, checked by Flask like any other login.
+  return login({ role, password: DEMO_PASSWORD, ...DEMO_ACCOUNTS[role] });
 }
 
 export async function registerWithDocuments(formData: FormData): Promise<{ status: "pending" }> {
-  if (USE_MOCKS) {
+  if (!isLive("registration")) {
     await delay();
     const role = String(formData.get("role") || "customer") as Exclude<Role, "admin">;
     const name = String(formData.get("name") || "").trim();
@@ -217,7 +224,7 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
 }
 
 export async function updateProfile(patch: Partial<Pick<User, "name" | "phone">>): Promise<User> {
-  if (USE_MOCKS) {
+  if (!isLive("auth")) {
     await delay(150);
     const session = currentSession();
     if (!session) throw new ApiError(401, "Please sign in again.");
@@ -236,7 +243,7 @@ export async function updateProfile(patch: Partial<Pick<User, "name" | "phone">>
 }
 
 export async function logoutRemote() {
-  if (USE_MOCKS) {
+  if (!isLive("auth")) {
     await delay(80);
     return;
   }

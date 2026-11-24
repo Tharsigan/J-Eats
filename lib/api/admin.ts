@@ -11,7 +11,7 @@ import type {
   VerificationStatus,
 } from "../types";
 import { delay, formatRs, uid } from "../utils";
-import { ApiError, apiFetch, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, apiFetchBlob, isLive, USE_MOCKS } from "./client";
 import { hourBuckets, rangeStart, type StatsRange } from "./cafeteria";
 
 export type { SystemLog };
@@ -43,7 +43,7 @@ export async function getLogs(): Promise<SystemLog[]> {
 }
 
 export async function listPendingApprovals(): Promise<VerificationApplication[]> {
-  if (USE_MOCKS) {
+  if (!isLive("approvals")) {
     await delay(100);
     return [...readDb().applications].sort((a, b) => {
       const pa = a.verificationStatus === "pending" ? 0 : 1;
@@ -58,7 +58,7 @@ export async function reviewApplication(
   id: string,
   status: Exclude<VerificationStatus, "pending">,
 ): Promise<VerificationApplication> {
-  if (USE_MOCKS) {
+  if (!isLive("approvals")) {
     await delay(250);
     return writeDb((db) => {
       const application = db.applications.find((item) => item.id === id);
@@ -122,6 +122,20 @@ export async function reviewApplication(
     method: "POST",
     body: JSON.stringify({ status }),
   });
+}
+
+/**
+ * Verification documents stored by Flask are only served to signed-in admins, so
+ * they are fetched with the admin's token instead of being opened as plain links.
+ * Returns true for document URLs that need this (paths on the API like /admin/documents/12).
+ */
+export function isProtectedDocument(url: string) {
+  return isLive("approvals") && url.startsWith("/admin/documents/");
+}
+
+export async function fetchVerificationDocument(url: string): Promise<Blob> {
+  if (!isProtectedDocument(url)) throw new ApiError(400, "This document is not stored on the server.");
+  return apiFetchBlob(url);
 }
 
 export async function listUsers(): Promise<User[]> {

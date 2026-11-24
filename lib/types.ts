@@ -23,6 +23,8 @@ export type VerificationDocument = {
   name: string;
   url: string;
   kind: string;
+  /** Set by the Flask API for stored files, e.g. "image/png" or "application/pdf". */
+  contentType?: string;
 };
 
 export type VerificationApplication = {
