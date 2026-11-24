@@ -3,6 +3,24 @@ import { TOKEN_COOKIE } from "../rbac";
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
 const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
 
+/**
+ * Features that use the real Flask API even while USE_MOCKS is on, e.g.
+ * NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals
+ * Everything not listed keeps using the browser mock database.
+ */
+export type LiveFeature = "auth" | "registration" | "approvals";
+const LIVE_FEATURES = new Set(
+  (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")
+    .split(",")
+    .map((f) => f.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+/** True when `feature` should call Flask: all features with USE_MOCKS=false, or the ones listed in LIVE_FEATURES. */
+export function isLive(feature: LiveFeature) {
+  return !USE_MOCKS || LIVE_FEATURES.has(feature);
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -18,34 +36,78 @@ export function readCookie(name: string) {
   return match ? decodeURIComponent(match.split("=")[1] ?? "") : "";
 }
 
-/** Flask-ready fetch wrapper. Swap USE_MOCKS off to hit the real REST API. */
-export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function send(path: string, init: RequestInit = {}) {
   const token = readCookie(TOKEN_COOKIE);
   const isFormData = typeof FormData !== "undefined" && init.body instanceof FormData;
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      headers: {
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch {
+    throw new ApiError(0, "Cannot reach the J Eats API. Is the Flask server running?");
+  }
   if (!res.ok) {
     const text = await res.text();
-    throw new ApiError(res.status, text || res.statusText);
+    let message = text || res.statusText;
+    try {
+      const body = JSON.parse(text) as { error?: string; message?: string };
+      message = body.error || body.message || message;
+    } catch {
+      // not JSON: keep the raw text
+    }
+    throw new ApiError(res.status, message);
   }
+  return res;
+}
+
+/** Flask-ready fetch wrapper. Swap USE_MOCKS off to hit the real REST API. */
+export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await send(path, init);
   return res.json() as Promise<T>;
+}
+
+/** Like apiFetch, but for files (e.g. verification documents) that need the sign-in token. */
+export async function apiFetchBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+  const res = await send(path, init);
+  return res.blob();
 }
 
 export { USE_MOCKS, BASE as API_BASE };
 
-/** Mock tokens look like `mock.<role>.<userId>`; the Flask API will issue real JWTs instead. */
+function decodeJwtPayload(token: string): { sub?: string; role?: string; exp?: number } | null {
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const base64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Who is signed in, read from the token cookie. Mock tokens look like
+ * `mock.<role>.<userId>`; real sign-ins carry a JWT from Flask. The JWT is only
+ * decoded here (not verified) so mock-backed pages know the user id; Flask
+ * verifies the signature on every API call.
+ */
 export function currentSession(): { role: string; userId: string } | null {
   const token = readCookie(TOKEN_COOKIE);
-  if (!token.startsWith("mock.")) return null;
-  const [, role, ...rest] = token.split(".");
-  const userId = rest.join(".");
-  return role && userId ? { role, userId } : null;
+  if (token.startsWith("mock.")) {
+    const [, role, ...rest] = token.split(".");
+    const userId = rest.join(".");
+    return role && userId ? { role, userId } : null;
+  }
+  const claims = token ? decodeJwtPayload(token) : null;
+  if (!claims?.sub || !claims.role) return null;
+  if (claims.exp && claims.exp * 1000 < Date.now()) return null;
+  return { role: claims.role, userId: claims.sub };
 }
 
 export function requireSession() {

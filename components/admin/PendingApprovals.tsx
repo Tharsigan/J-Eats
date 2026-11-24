@@ -3,11 +3,11 @@
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { listPendingApprovals, reviewApplication } from "@/lib/api/admin";
+import { fetchVerificationDocument, isProtectedDocument, listPendingApprovals, reviewApplication } from "@/lib/api/admin";
 import { useAction, useApi } from "@/lib/hooks/useApi";
-import type { VerificationStatus } from "@/lib/types";
+import type { VerificationDocument, VerificationStatus } from "@/lib/types";
 import { formatWhen } from "@/lib/utils";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const FILTERS = ["pending", "approved", "rejected", "all"] as const;
 
@@ -17,13 +17,54 @@ function toneFor(status: VerificationStatus): "warn" | "brand" | "danger" {
   return "warn";
 }
 
+/** Thumbnail for an admin-only document stored by the Flask API (fetched with the admin's token). */
+function ProtectedThumbnail({ doc }: { doc: VerificationDocument }) {
+  const [src, setSrc] = useState("");
+  useEffect(() => {
+    if (!doc.contentType?.startsWith("image/")) return;
+    let objectUrl = "";
+    let cancelled = false;
+    fetchVerificationDocument(doc.url)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setSrc(objectUrl);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [doc.url, doc.contentType]);
+  // eslint-disable-next-line @next/next/no-img-element
+  return src ? <img src={src} alt="" className="mt-2 h-20 w-20 rounded-lg object-cover" /> : null;
+}
+
+async function openProtectedDocument(doc: VerificationDocument) {
+  // Open the tab straight away (inside the click) so pop-up blockers allow it.
+  const tab = window.open("", "_blank");
+  try {
+    const blob = await fetchVerificationDocument(doc.url);
+    const objectUrl = URL.createObjectURL(blob);
+    if (tab) tab.location.href = objectUrl;
+    else window.location.assign(objectUrl);
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}
+
 export function PendingApprovals() {
-  const { data: all } = useApi(listPendingApprovals);
+  const { data: all, reload } = useApi(listPendingApprovals);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("pending");
-  const { busy: busyId, error, message, run } = useAction();
+  const { busy: busyId, error, message, run, setError } = useAction();
 
   function review(id: string, status: Exclude<VerificationStatus, "pending">) {
-    void run(id, () => reviewApplication(id, status), (a) => `${a.name} ${status}. ${status === "approved" ? "They can sign in now." : ""}`);
+    void run(id, () => reviewApplication(id, status), (a) => `${a.name} ${status}. ${status === "approved" ? "They can sign in now." : ""}`).then(
+      // The mock database refreshes views by itself; the real API needs an explicit reload.
+      () => void reload(),
+    );
   }
 
   if (!all) {
@@ -73,7 +114,19 @@ export function PendingApprovals() {
                   <p className="font-medium">{doc.kind}</p>
                   <p className="text-xs text-muted">
                     {doc.name}
-                    {doc.url ? (
+                    {isProtectedDocument(doc.url) ? (
+                      <button
+                        type="button"
+                        className="ml-2 text-brand"
+                        onClick={() =>
+                          void openProtectedDocument(doc).catch((err) =>
+                            setError(err instanceof Error ? err.message : "Could not open the document."),
+                          )
+                        }
+                      >
+                        Open ↗
+                      </button>
+                    ) : doc.url ? (
                       <a href={doc.url} target="_blank" rel="noreferrer" className="ml-2 text-brand">
                         Open ↗
                       </a>
@@ -81,7 +134,9 @@ export function PendingApprovals() {
                       <span className="ml-2">· file preview not stored in demo</span>
                     )}
                   </p>
-                  {doc.url ? (
+                  {isProtectedDocument(doc.url) ? (
+                    <ProtectedThumbnail doc={doc} />
+                  ) : doc.url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={doc.url} alt="" className="mt-2 h-20 w-20 rounded-lg object-cover" />
                   ) : null}

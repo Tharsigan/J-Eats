@@ -1,16 +1,30 @@
-# J Eats API (Flask) - Phase 1
+# J Eats API (Flask)
 
-This folder is the Python backend. Right now it only **starts Flask, connects to
-MySQL, and has a health check**. Login, orders and payments come in Phase 2.
+This folder is the Python backend. It connects to MySQL / MariaDB and serves:
+
+- **Sign-in** with real password checks and signed, expiring login tokens (JWT)
+- **Registration** for customers, riders and cafeterias, with document uploads
+- **Admin approvals**: list, approve and reject applications, view documents (admins only)
+- Health checks
+
+Orders, menus, wallets and the other dashboards still run on the frontend's
+browser mock until they get endpoints here.
 
 ```
 backend/
 ├── app.py            # starts Flask, turns on CORS, registers routes
 ├── config.py         # reads settings from .env
-├── db.py             # MySQL connection + query helpers
+├── db.py             # MySQL connection, query helpers, transaction()
+├── auth.py           # password hashing, JWT tokens, @require_role
+├── uploads.py        # verification document checks and storage
+├── serializers.py    # database rows -> the JSON shapes the frontend uses
 ├── routes/
 │   ├── __init__.py   # registers every route group under /api
-│   └── health.py     # GET /api/health and GET /api/health/db
+│   ├── health.py     # GET /api/health and GET /api/health/db
+│   ├── auth.py       # /api/auth/login, /register, /me, /logout
+│   └── admin.py      # /api/admin/approvals, /api/admin/documents/<id>
+├── tests/            # pytest, runs against a throwaway database
+├── uploads/          # uploaded documents (created automatically, gitignored)
 ├── requirements.txt  # Python packages
 └── .env.example      # copy to .env and fill in
 ```
@@ -55,7 +69,14 @@ Copy `.env.example` to a new file called `.env` in this folder.
 
 XAMPP's MySQL uses user `root` with **no password** by default, so the example
 values usually work as they are. If you set a MySQL password, put it in
-`DB_PASSWORD`. `.env` is ignored by git, so it never gets pushed.
+`DB_PASSWORD`. If MariaDB runs on another port (for example 3307), set `DB_PORT`.
+`.env` is ignored by git, so it never gets pushed.
+
+Set `JWT_SECRET` to a long random string. Generate one with:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
 
 ## 4. Run the API
 
@@ -80,16 +101,66 @@ If `/api/health/db` shows `"status": "error"`, read the `message`:
 
 The frontend calls `NEXT_PUBLIC_API_URL`, which is already
 `http://localhost:5000/api` in the root `.env.example`. CORS here allows
-`http://localhost:3000` (set in `FRONTEND_ORIGINS`). Keep
-`NEXT_PUBLIC_USE_MOCKS=true` until Phase 2 adds the real routes.
+`http://localhost:3000` (set in `FRONTEND_ORIGINS`).
 
-## Writing queries (for Phase 2)
+To use this API for sign-in, registration and approvals while the rest of the
+app keeps its mock data, create `.env.local` in the project root with:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:5000/api
+NEXT_PUBLIC_USE_MOCKS=true
+NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals
+```
+
+Restart `npm run dev` after changing it. Sign in with the seeded accounts and
+their real password, `demo123` (the quick demo buttons do this for you).
+
+## Endpoints
+
+| Method | Path | Who | What |
+| --- | --- | --- | --- |
+| POST | `/api/auth/login` | anyone | `{role, identifier, password, customerSubRole?}` -> `{user, token}` |
+| POST | `/api/auth/register` | anyone | multipart form from the registration pages -> `{status: "pending"}` |
+| GET / PATCH | `/api/auth/me` | signed in | read / update name and phone |
+| POST | `/api/auth/logout` | anyone | the browser forgets its token |
+| GET | `/api/admin/approvals` | admin | every application, pending first |
+| POST | `/api/admin/approvals/<id>` | admin | `{status: "approved" \| "rejected"}`; pending applications only |
+| GET | `/api/admin/documents/<id>` | admin | an uploaded verification document |
+
+Send the token as `Authorization: Bearer <token>`. Tokens expire after
+`JWT_EXPIRES_MINUTES`. Every request re-reads the user from the database, so
+suspending or rejecting an account takes effect immediately.
+
+Approving an application updates `verification_applications` and the matching
+`users` row in one transaction. It also creates an empty `wallets` row for
+customers and riders, and a `vendors` row for a cafeteria that doesn't have one,
+the same as the demo did.
+
+## Tests
+
+The tests build a throwaway database called `j_eats_test` from
+`database/schema.sql` and `seed.sql`, and drop it afterwards. They never touch
+`j_eats`.
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+TEST_DB_PORT=3307 TEST_DB_USER=root TEST_DB_PASSWORD= pytest
+```
+
+(On Windows PowerShell: `$env:TEST_DB_PORT=3307; pytest`.)
+
+## Writing queries
 
 ```python
-from db import query, query_one, execute
+from db import query, query_one, execute, transaction
 
 items = query("SELECT * FROM menu_items WHERE vendor_id = %s", (vendor_id,))
 user = query_one("SELECT * FROM users WHERE email = %s", (email,))
+
+# Several writes that must all succeed or all fail:
+with transaction() as tx:
+    tx.execute("UPDATE ...", (...))
+    tx.execute("INSERT ...", (...))
 ```
 
 Always use `%s` placeholders for values, never f-strings. That keeps the app
