@@ -45,10 +45,13 @@ restores the original seed.
 
 - `lib/api/*` — the only data layer used by the UI. Each function has a mock branch and an `apiFetch(...)` REST call.
   Set `NEXT_PUBLIC_USE_MOCKS=false` and `NEXT_PUBLIC_API_URL` to point the app at the Flask API.
-- `NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users,menu` switches the listed features (sign-in, registration, admin approvals, admin Users, menu and browsing)
-  to the Flask API + MariaDB (see `backend/README.md`), while everything else keeps using the mock database.
+- `NEXT_PUBLIC_LIVE_FEATURES` switches the listed features to the Flask API + MariaDB (see `backend/README.md`), while
+  anything not listed keeps using the mock database. Every feature can now be live:
+  `auth,registration,approvals,users,menu,cafeteria,wallet,orders,courier,notifications,admin`. `NEXT_PUBLIC_USE_MOCKS=false` turns them all on at once (recommended, so no page mixes mock and real data).
+- Before going live on an existing database, run `database/migrations/001_menu_tags_featured_rider_online.sql` (adds 3 columns).
+- In live mode "Reset demo data" (Admin → Logs) is turned off: it only ever reset the browser copy, never MariaDB.
 - `lib/mock-db/` — the localStorage-backed mock database (seeded from `lib/mock-data/campus.ts`) plus workflow helpers
   (notifications, ledger, wallet, activity log). Never imported by UI components.
 - `lib/hooks/useApi.ts` — fetches through the services and re-fetches whenever demo data changes (in this tab or another);
-  against the real API it polls instead.
+  when any feature is live it also polls every 15 seconds, so changes made by other users appear.
 - No real payments are processed: wallet top-ups and card payments are simulated.

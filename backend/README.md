@@ -103,14 +103,20 @@ The frontend calls `NEXT_PUBLIC_API_URL`, which is already
 `http://localhost:5000/api` in the root `.env.example`. CORS here allows
 `http://localhost:3000` (set in `FRONTEND_ORIGINS`).
 
-To use this API for sign-in, registration and approvals while the rest of the
-app keeps its mock data, create `.env.local` in the project root with:
+To run the whole app on MariaDB, create `.env.local` in the project root with:
 
 ```
 NEXT_PUBLIC_API_URL=http://localhost:5000/api
-NEXT_PUBLIC_USE_MOCKS=true
-NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users,menu
+NEXT_PUBLIC_USE_MOCKS=false
 ```
+
+To switch only some features, keep `NEXT_PUBLIC_USE_MOCKS=true` and list them,
+for example `NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users,menu,cafeteria,wallet,orders,courier,notifications,admin`. Pages that aren't listed keep
+the browser mock data, so a mix can show different numbers on different pages.
+
+If your `j_eats` database was created before these changes, run
+`database/migrations/001_menu_tags_featured_rider_online.sql` once (back up
+first; it only adds 3 columns), then restart Flask.
 
 Restart `npm run dev` after changing it. Sign in with the seeded accounts and
 their real password, `demo123` (the quick demo buttons do this for you).
@@ -133,6 +139,22 @@ their real password, `demo123` (the quick demo buttons do this for you).
 | GET / POST | `/api/favourites`, `/api/favourites/<item_id>` | signed in | list / toggle favourites |
 | GET | `/api/admin/users` | admin | every account (never password hashes) |
 | POST | `/api/admin/users/<id>/status` | admin | `{status: "active" \| "suspended"}`; admins can't be suspended |
+| POST | `/api/auth/forgot-password` | anyone | `{email}`; confirms the account exists (no email is sent) |
+| GET / PATCH / POST / DELETE | `/api/cafeteria/vendor`, `/menu`, `/inventory/<id>`, `/queue` | cafeteria | my kitchen, menu items, stock, photos and queue |
+| GET | `/api/media/menu/<file>` | anyone | uploaded food photos |
+| GET | `/api/wallet`, POST `/api/wallet/topup` | signed in | wallet and simulated top-ups (Rs. 100 to 50,000) |
+| GET / POST | `/api/stalls`, `/api/stalls/<id>/support` | anyone / customer | fundraising stalls, paid from the wallet |
+| POST | `/api/promos/check` | customer | preview FIRSTBITE / CAMPUSCREW |
+| POST | `/api/orders` | customer | place an order (one per vendor); prices and stock come from the database |
+| GET | `/api/orders/mine`, `/api/orders/latest`, `/api/orders/<id>` | customer (or its kitchen, rider, admin) | orders and tracking |
+| POST | `/api/orders/<id>/cancel`, `/reschedule`; GET `/receipt` | customer | cancel (refund + restock), new slot, receipt text |
+| GET / POST | `/api/cafeteria/orders`, `/orders/<id>/status`, `/orders/<id>/reject`, GET `/cafeteria/stats` | cafeteria | kitchen tickets; "ready" on a delivery order opens a rider job |
+| GET / POST | `/api/courier/jobs`, `/jobs/active`, `/jobs/<id>/accept \| decline \| pickup \| complete` | rider | delivery jobs; completing pays the rider's wallet |
+| GET / POST | `/api/courier/status`, `/courier/stats`, `/courier/withdraw` | rider | Online switch, earnings, simulated withdrawal |
+| GET / POST | `/api/notifications`, `/notifications/<id>/read`, `/notifications/read-all` | signed in | my notifications and role broadcasts |
+| GET | `/api/admin/ledger`, `/admin/logs`, `/admin/stats`, `/admin/analytics/peak`, `/admin/orders` | admin | dashboards |
+| GET / PUT | `/api/admin/settings` | signed in / admin | platform settings (fees, cash cutoff, ordering on/off) |
+| POST | `/api/admin/reset` | admin | always refused: the demo reset never touches MariaDB |
 
 Send the token as `Authorization: Bearer <token>`. Tokens expire after
 `JWT_EXPIRES_MINUTES`. Every request re-reads the user from the database, so
