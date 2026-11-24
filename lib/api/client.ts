@@ -17,7 +17,10 @@ export type LiveFeature =
   | "menu"
   | "cafeteria"
   | "wallet"
-  | "orders";
+  | "orders"
+  | "courier"
+  | "notifications"
+  | "admin";
 const LIVE_FEATURES = new Set(
   (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")
     .split(",")
