@@ -2,7 +2,7 @@ import { nextOrderId, nextRef, readDb, writeDb, type MockDb } from "../mock-db/d
 import { addLedger, logEvent, notify, notifyVendor, walletFor, walletTxn } from "../mock-db/events";
 import type { CartLine, Fulfillment, Order, OrderStatus, PaymentMethod } from "../types";
 import { delay, formatRs } from "../utils";
-import { ApiError, apiFetch, requireSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, apiFetchOptional, isLive, requireSession } from "./client";
 
 export const ACTIVE_STATUSES: OrderStatus[] = ["placed", "accepted", "preparing", "ready", "out_for_delivery"];
 
@@ -50,7 +50,7 @@ export function promoDiscount(
 
 /** Preview a promo code at checkout without placing an order. */
 export async function checkPromo(code: string, subtotal: number, deliveryFees: number) {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     const { userId } = requireSession();
     const r = promoDiscount(readDb(), userId, code, subtotal, deliveryFees);
     return { ...r, description: r.code ? PROMOS[r.code] : "" };
@@ -93,7 +93,7 @@ export function releaseOrder(db: MockDb, order: Order, reason: string, by: strin
 }
 
 export async function listOrders(): Promise<Order[]> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(120);
     return [...readDb().orders].sort(sortNewest);
   }
@@ -102,7 +102,7 @@ export async function listOrders(): Promise<Order[]> {
 
 /** Orders for the signed-in customer. */
 export async function listMyOrders(): Promise<Order[]> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(120);
     const { userId } = requireSession();
     return readDb()
@@ -113,16 +113,16 @@ export async function listMyOrders(): Promise<Order[]> {
 }
 
 export async function getOrder(id: string): Promise<Order | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(80);
     return readDb().orders.find((o) => o.id === id);
   }
-  return apiFetch(`/orders/${id}`);
+  return apiFetchOptional<Order>(`/orders/${encodeURIComponent(id)}`);
 }
 
 /** Kept for compatibility: returns the requested order or the customer's latest active one. */
 export async function trackOrder(id?: string): Promise<Order | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(80);
     const db = readDb();
     if (id) {
@@ -133,11 +133,15 @@ export async function trackOrder(id?: string): Promise<Order | undefined> {
     const mine = db.orders.filter((o) => o.customerId === session.userId).sort(sortNewest);
     return mine.find((o) => ACTIVE_STATUSES.includes(o.status)) ?? mine[0];
   }
-  return apiFetch(`/orders/${id ?? "latest"}`);
+  if (id) {
+    const found = await apiFetchOptional<Order>(`/orders/${encodeURIComponent(id)}`);
+    if (found) return found;
+  }
+  return apiFetchOptional<Order>("/orders/latest");
 }
 
 export async function placeOrder(payload: PlaceOrderPayload): Promise<PlaceOrderResult> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(450);
     const session = requireSession();
     return writeDb((db) => {
@@ -278,7 +282,7 @@ export async function placeOrder(payload: PlaceOrderPayload): Promise<PlaceOrder
 }
 
 export async function cancelOrder(id: string, reason: string): Promise<Order> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(250);
     const session = requireSession();
     return writeDb((db) => {
@@ -304,7 +308,7 @@ export async function cancelOrder(id: string, reason: string): Promise<Order> {
 }
 
 export async function rescheduleOrder(id: string, slot: string, scheduledFor?: string): Promise<Order> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     await delay(200);
     const session = requireSession();
     return writeDb((db) => {
@@ -323,7 +327,7 @@ export async function rescheduleOrder(id: string, slot: string, scheduledFor?: s
 
 /** Plain-text receipt. The Flask API can return a PDF from the same route later. */
 export async function getReceipt(id: string): Promise<string> {
-  if (USE_MOCKS) {
+  if (!isLive("orders")) {
     const order = readDb().orders.find((o) => o.id === id);
     if (!order) throw new ApiError(404, "Order not found.");
     const lines = (order.lines ?? []).map(
