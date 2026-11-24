@@ -5,6 +5,7 @@ Run it with:  python app.py   (then open http://localhost:5000/api/health)
 from flask import Flask, jsonify
 from flask_cors import CORS
 
+import auth
 import db
 from config import Config
 from routes import register_routes
@@ -22,6 +23,7 @@ def create_app(config_class=Config) -> Flask:
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 
+    auth.init_app(app)
     db.init_app(app)
     register_routes(app)
 
@@ -29,6 +31,14 @@ def create_app(config_class=Config) -> Flask:
     @app.errorhandler(404)
     def not_found(_e):
         return jsonify(error="Not found"), 404
+
+    @app.errorhandler(405)
+    def method_not_allowed(_e):
+        return jsonify(error="Method not allowed"), 405
+
+    @app.errorhandler(413)
+    def too_large(_e):
+        return jsonify(error=f"Upload too large. Each document must be {app.config['MAX_DOCUMENT_MB']} MB or smaller."), 413
 
     @app.errorhandler(500)
     def server_error(_e):
