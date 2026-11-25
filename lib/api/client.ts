@@ -1,3 +1,4 @@
+import { DB_EVENT } from "../mock-db/db";
 import { TOKEN_COOKIE } from "../rbac";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
@@ -8,13 +9,29 @@ const USE_MOCKS = process.env.NEXT_PUBLIC_USE_MOCKS !== "false";
  * NEXT_PUBLIC_LIVE_FEATURES=auth,registration,approvals,users
  * Everything not listed keeps using the browser mock database.
  */
-export type LiveFeature = "auth" | "registration" | "approvals" | "users";
+export type LiveFeature =
+  | "auth"
+  | "registration"
+  | "approvals"
+  | "users"
+  | "menu"
+  | "cafeteria"
+  | "wallet"
+  | "orders"
+  | "courier"
+  | "notifications"
+  | "admin";
 const LIVE_FEATURES = new Set(
   (process.env.NEXT_PUBLIC_LIVE_FEATURES ?? "")
     .split(",")
     .map((f) => f.trim().toLowerCase())
     .filter(Boolean),
 );
+
+/** True when any feature calls Flask, so views should poll for other people's changes. */
+export function anyLive() {
+  return !USE_MOCKS || LIVE_FEATURES.size > 0;
+}
 
 /** True when `feature` should call Flask: all features with USE_MOCKS=false, or the ones listed in LIVE_FEATURES. */
 export function isLive(feature: LiveFeature) {
@@ -69,7 +86,22 @@ async function send(path: string, init: RequestInit = {}) {
 /** Flask-ready fetch wrapper. Swap USE_MOCKS off to hit the real REST API. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await send(path, init);
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as T;
+  // Like the mock database's change event: a successful write refreshes every view that uses useApi().
+  if ((init.method ?? "GET").toUpperCase() !== "GET" && typeof window !== "undefined") {
+    window.dispatchEvent(new Event(DB_EVENT));
+  }
+  return data;
+}
+
+/** apiFetch for "get one" calls: a 404 becomes `undefined`, like the mock's `find()`. */
+export async function apiFetchOptional<T>(path: string): Promise<T | undefined> {
+  try {
+    return await apiFetch<T>(path);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return undefined;
+    throw err;
+  }
 }
 
 /** Like apiFetch, but for files (e.g. verification documents) that need the sign-in token. */

@@ -11,13 +11,13 @@ import type {
   VerificationStatus,
 } from "../types";
 import { delay, formatRs, uid } from "../utils";
-import { ApiError, apiFetch, apiFetchBlob, isLive, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, apiFetchBlob, isLive } from "./client";
 import { hourBuckets, rangeStart, type StatsRange } from "./cafeteria";
 
 export type { SystemLog };
 
 export async function getLedger(type?: LedgerEntry["type"] | "all"): Promise<LedgerEntry[]> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(120);
     const ledger = readDb().ledger;
     return ledger.filter((l) => !type || type === "all" || l.type === type);
@@ -26,7 +26,7 @@ export async function getLedger(type?: LedgerEntry["type"] | "all"): Promise<Led
 }
 
 export async function getPeakHours(range: StatsRange = "week"): Promise<{ hour: string; value: number }[]> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(80);
     const from = rangeStart(range);
     return hourBuckets(readDb().orders.filter((o) => new Date(o.createdAt ?? 0).getTime() >= from));
@@ -35,7 +35,7 @@ export async function getPeakHours(range: StatsRange = "week"): Promise<{ hour: 
 }
 
 export async function getLogs(): Promise<SystemLog[]> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(80);
     return [...readDb().logs];
   }
@@ -165,7 +165,7 @@ export async function setUserStatus(id: string, status: "active" | "suspended"):
 }
 
 export async function listAllOrders(): Promise<Order[]> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(100);
     return [...readDb().orders].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
   }
@@ -186,7 +186,7 @@ export type PlatformStats = {
 };
 
 export async function getPlatformStats(range: StatsRange = "today"): Promise<PlatformStats> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(100);
     const db = readDb();
     const from = rangeStart(range);
@@ -238,14 +238,14 @@ export async function getPlatformStats(range: StatsRange = "today"): Promise<Pla
 }
 
 export async function getSettings(): Promise<PlatformSettings> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     return { ...readDb().settings };
   }
   return apiFetch("/admin/settings");
 }
 
 export async function saveSettings(next: PlatformSettings): Promise<PlatformSettings> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(200);
     if (next.deliveryFee < 0 || next.riderPayout < 0) throw new ApiError(400, "Fees cannot be negative.");
     if (next.cashCutoffHour < 0 || next.cashCutoffHour > 23) throw new ApiError(400, "Cash cutoff must be an hour between 0 and 23.");
@@ -274,7 +274,7 @@ export async function saveSettings(next: PlatformSettings): Promise<PlatformSett
 
 /** Restore the original seed data (demo convenience; no backend equivalent needed). */
 export async function resetDemoData(): Promise<{ ok: boolean }> {
-  if (USE_MOCKS) {
+  if (!isLive("admin")) {
     await delay(200);
     resetDb();
     return { ok: true };

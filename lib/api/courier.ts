@@ -2,7 +2,7 @@ import { readDb, writeDb, type MockDb } from "../mock-db/db";
 import { addLedger, logEvent, notify, notifyVendor, walletFor, walletTxn } from "../mock-db/events";
 import type { CourierJob, Order } from "../types";
 import { delay, formatRs } from "../utils";
-import { ApiError, apiFetch, requireSession, USE_MOCKS } from "./client";
+import { ApiError, apiFetch, isLive, requireSession } from "./client";
 
 const ACTIVE_JOB: CourierJob["status"][] = ["accepted", "picked"];
 
@@ -21,7 +21,7 @@ function withOrder(db: MockDb, job: CourierJob): JobView {
 
 /** Open jobs the rider has not declined, plus the rider's own jobs. */
 export async function listJobs(): Promise<JobView[]> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(120);
     const db = readDb();
     const rider = me(db);
@@ -39,7 +39,7 @@ export async function listJobs(): Promise<JobView[]> {
 }
 
 export async function getActiveJob(): Promise<JobView | null> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     const db = readDb();
     const rider = me(db);
     const job = db.jobs.find((j) => j.courierId === rider.id && ACTIVE_JOB.includes(j.status));
@@ -49,7 +49,7 @@ export async function getActiveJob(): Promise<JobView | null> {
 }
 
 export async function acceptJob(id: string): Promise<CourierJob | undefined> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(250);
     return writeDb((db) => {
       const rider = me(db);
@@ -79,7 +79,7 @@ export async function acceptJob(id: string): Promise<CourierJob | undefined> {
 }
 
 export async function declineJob(id: string): Promise<{ ok: boolean }> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(120);
     return writeDb((db) => {
       const rider = me(db);
@@ -95,7 +95,7 @@ export async function declineJob(id: string): Promise<{ ok: boolean }> {
 
 /** Rider collected the food from the counter → order is out for delivery. */
 export async function pickUpJob(id: string): Promise<CourierJob> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(200);
     return writeDb((db) => {
       const rider = me(db);
@@ -120,7 +120,7 @@ export async function pickUpJob(id: string): Promise<CourierJob> {
 
 /** Drop-off confirmed → order delivered and the rider is paid the job payout. */
 export async function completeJob(id: string): Promise<CourierJob> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(250);
     return writeDb((db) => {
       const rider = me(db);
@@ -156,7 +156,7 @@ export async function completeJob(id: string): Promise<CourierJob> {
 }
 
 export async function getOnline(): Promise<boolean> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     const db = readDb();
     return db.riderOnline[me(db).id] ?? true;
   }
@@ -164,7 +164,7 @@ export async function getOnline(): Promise<boolean> {
 }
 
 export async function setOnline(online: boolean): Promise<boolean> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     return writeDb((db) => {
       const rider = me(db);
       db.riderOnline[rider.id] = online;
@@ -185,7 +185,7 @@ export type RiderStats = {
 };
 
 export async function getRiderStats(): Promise<RiderStats> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(80);
     const db = readDb();
     const rider = me(db);
@@ -213,7 +213,7 @@ export async function getRiderStats(): Promise<RiderStats> {
 
 /** Simulated weekly settlement: moves the rider wallet balance out to a bank payout. */
 export async function withdrawEarnings(): Promise<{ amount: number }> {
-  if (USE_MOCKS) {
+  if (!isLive("courier")) {
     await delay(350);
     return writeDb((db) => {
       const rider = me(db);

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { getLogs, getSettings, resetDemoData, saveSettings } from "@/lib/api/admin";
+import { isLive } from "@/lib/api/client";
 import { useAction, useApi } from "@/lib/hooks/useApi";
 import { useAuthStore } from "@/lib/stores/auth";
 import { useCartStore } from "@/lib/stores/cart";
@@ -14,6 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 const LEVELS = ["all", "info", "ok", "warn", "error"] as const;
+const resetOff = isLive("admin");
 
 export default function LogsPage() {
   const router = useRouter();
@@ -124,7 +126,9 @@ export default function LogsPage() {
       <Card>
         <h2 className="font-bold">Demo data</h2>
         <p className="mt-2 text-sm text-muted">
-          All demo data lives in this browser&apos;s localStorage. Resetting restores the original seed (orders, users, wallets) and signs you out.
+          {resetOff
+            ? "The admin tools are using the MariaDB database, so the browser demo reset is turned off. Your database is never reset from here."
+            : "All demo data lives in this browser's localStorage. Resetting restores the original seed (orders, users, wallets) and signs you out."}
         </p>
         <div className="mt-3 flex gap-2">
           {confirmReset ? (
@@ -137,7 +141,7 @@ export default function LogsPage() {
               </Button>
             </>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setConfirmReset(true)}>
+            <Button variant="outline" size="sm" disabled={resetOff} onClick={() => setConfirmReset(true)}>
               Reset demo data
             </Button>
           )}

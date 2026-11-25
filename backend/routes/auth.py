@@ -153,6 +153,23 @@ def logout():
     return jsonify(ok=True)
 
 
+@bp.post("/auth/forgot-password")
+def forgot_password():
+    """Demo password reset, like the mock: confirms the account exists. No email is sent."""
+    email = str((request.get_json(silent=True) or {}).get("email") or "").strip().lower()[:190]
+    if not EMAIL_RE.match(email):
+        return _error(400, "Enter the email address you registered with.")
+    user = query_one("SELECT email FROM users WHERE LOWER(email) = %s", (email,))
+    if not user:
+        return _error(404, "No J Eats account uses that email address.")
+    with transaction() as tx:
+        tx.execute(
+            "INSERT INTO system_logs (id, level, message, created_at) VALUES (%s, 'info', %s, %s)",
+            (new_id("log"), f"Password reset requested for {user['email']}", _utcnow()),
+        )
+    return jsonify(ok=True)
+
+
 # ---------------------------------------------------------------- register
 # Which documents each role must upload (matches the three registration forms).
 REQUIRED_DOCS = {"customer": 1, "courier": 2, "cafeteria": 2}

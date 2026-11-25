@@ -100,3 +100,59 @@ def resolve(rel: str) -> Path:
 
 def content_type(rel: str) -> str:
     return ALLOWED[rel.rsplit(".", 1)[-1]][0]
+
+
+# ---------------------------------------------------------------- food photos
+MENU_SUBDIR = "menu"
+MENU_NAME = re.compile(r"^[0-9a-f]{32}\.(png|jpg|webp)$")
+MAX_PHOTO_BYTES = 400 * 1024  # the browser shrinks photos to 800px JPEGs first
+UNSPLASH_PREFIX = "https://images.unsplash.com/"
+
+
+def save_menu_photo(image: str | None) -> str | None:
+    """Turn the frontend's image value into what menu_items.image_url stores.
+
+    - "" / None          -> None (use the default photo)
+    - Unsplash URL       -> kept as is
+    - data:image/...     -> decoded, checked, saved; returns "/media/menu/<file>"
+    - "/media/menu/..."  -> an already-saved photo, kept as is
+    """
+    import base64
+    import binascii
+
+    value = (image or "").strip()
+    if not value:
+        return None
+    if value.startswith(UNSPLASH_PREFIX):
+        if len(value) > 255:
+            raise UploadError("That image link is too long.")
+        return value
+    if value.startswith("/media/menu/") and MENU_NAME.match(value.rsplit("/", 1)[-1]):
+        return value
+    if not value.startswith("data:image/") or ";base64," not in value:
+        raise UploadError("Upload the photo as a JPG or PNG file.")
+    try:
+        data = base64.b64decode(value.split(";base64,", 1)[1], validate=True)
+    except (binascii.Error, ValueError):
+        raise UploadError("That photo could not be read. Try another file.")
+    if len(data) > MAX_PHOTO_BYTES:
+        raise UploadError("That photo is too large. Choose a smaller image.")
+    ext = _detect(data)
+    if ext not in ("png", "jpg", "webp"):
+        raise UploadError("Upload the photo as a JPG or PNG file.")
+    folder = _root() / MENU_SUBDIR
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"{uuid.uuid4().hex}.{ext}"
+    with open(folder / name, "xb") as fh:
+        fh.write(data)
+    return f"/media/menu/{name}"
+
+
+def menu_photo_path(name: str) -> Path:
+    if not MENU_NAME.match(name or ""):
+        raise UploadError("Unknown photo.")
+    path = (_root() / MENU_SUBDIR / name).resolve()
+    if _root() not in path.parents:
+        raise UploadError("Unknown photo.")
+    return path
+
